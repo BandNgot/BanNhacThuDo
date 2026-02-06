@@ -3702,25 +3702,28 @@ function redzlib:MakeWindow(Configs)
 	})
 
 	local SearchActive = false
-	local ActiveTab
 	local function UpdateSearch(Query)
 		Query = string.lower(Query or "")
-		local firstVisible = nil
 
-		for _, TabRec in pairs(redzlib.Tabs) do
-			local name = string.lower(TabRec.TabInfo.Name or "")
-			local match = Query == "" or string.find(name, Query, 1, true)
-			if TabRec.Select then
-				TabRec.Select.Visible = match
-				if match and not firstVisible then
-					firstVisible = TabRec
-				end
+		-- Restore original parents
+		for _, ElementData in pairs(redzlib.AllElements) do
+			if ElementData.Instance and ElementData.OriginalParent and ElementData.Instance.Parent == SearchContainer then
+				ElementData.Instance.Parent = ElementData.OriginalParent
+				ElementData.Instance.Visible = true
 			end
 		end
 
-		-- nếu tab đang chọn bị ẩn thì chọn tab đầu tiên còn hiển thị
-		if ActiveTab and ActiveTab.Select and not ActiveTab.Select.Visible then
-			if firstVisible then firstVisible.func:Enable() end
+		if Query == "" then return end
+
+		for _, ElementData in pairs(redzlib.AllElements) do
+			local Name = string.lower(ElementData.Name or "")
+			local SectionName = ElementData.SectionName and string.lower(ElementData.SectionName) or ""
+			if string.find(Name, Query, 1, true) or (SectionName ~= "" and string.find(SectionName, Query, 1, true)) then
+				if ElementData.Instance then
+					ElementData.Instance.Parent = SearchContainer
+					ElementData.Instance.Visible = true
+				end
+			end
 		end
 	end
 
@@ -3728,11 +3731,15 @@ function redzlib:MakeWindow(Configs)
 		SearchActive = not SearchActive
 		if SearchActive then
 			CreateTween({SearchInputFrame, "Size", UDim2.new(0, 140, 0, 22), 0.3})
+			SearchContainer.Visible = true
+			Containers.Visible = false
 			SearchInput:CaptureFocus()
 		else
 			CreateTween({SearchInputFrame, "Size", UDim2.new(0, 0, 0, 22), 0.3})
 			SearchInput.Text = ""
 			UpdateSearch("")
+			SearchContainer.Visible = false
+			Containers.Visible = true
 		end
 	end)
 
