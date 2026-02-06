@@ -3703,6 +3703,7 @@ function redzlib:MakeWindow(Configs)
 
 	local SearchActive = false
 	local ActiveTab
+	local ActiveContainer
 	local VisitedTabs = {}
 
 	local function MarkVisited(Container)
@@ -3742,10 +3743,10 @@ function redzlib:MakeWindow(Configs)
 		SearchContainer.Visible = true
 		Containers.Visible = false
 
-		local ActiveContainer = ActiveTab and ActiveTab.Cont
+		local ActiveContainerLocal = ActiveContainer or (ActiveTab and ActiveTab.Cont)
 		for _, ElementData in pairs(redzlib.AllElements) do
 			if ElementData.Instance then
-				local inActive = ActiveContainer and ElementData.OriginalParent == ActiveContainer
+				local inActive = ActiveContainerLocal and ElementData.OriginalParent == ActiveContainerLocal
 				local isAllowed = AllowedTypes[ElementData.Type] or false
 				local Name = string.lower(ElementData.Name or "")
 				local match = inActive and isAllowed and string.find(Name, Query, 1, true)
@@ -4109,6 +4110,7 @@ function redzlib:MakeWindow(Configs)
 			CreateTween({Selected, "Size", UDim2.new(0, 4, 0, 13), 0.35})
 			CreateTween({Selected, "BackgroundTransparency", 0, 0.35})
 			ActiveTab = Tab
+			ActiveContainer = Container
 			MarkVisited(Container)
 		end
 		TabSelect.Activated:Connect(Tabs)
@@ -4117,6 +4119,7 @@ function redzlib:MakeWindow(Configs)
 		local Tab = {}
 		if not ActiveTab then
 			ActiveTab = Tab
+			ActiveContainer = Container
 			MarkVisited(Container)
 		end
 		local CurrentSectionName = nil
@@ -4272,21 +4275,6 @@ function redzlib:MakeWindow(Configs)
 			
 			local Button, LabelFunc = ButtonFrame(Container, TName, TDesc, UDim2.new(1, -38))
 			SetLayoutOrder(Container, Button)
-			table.insert(redzlib.AllElements, {
-				Type = "TextBox",
-				Name = TName,
-				Instance = Button,
-				OriginalParent = Container,
-				SectionName = CurrentSectionName
-			})
-			SetLayoutOrder(Container, Button)
-			table.insert(redzlib.AllElements, {
-				Type = "Toggle",
-				Name = TName,
-				Instance = Button,
-				OriginalParent = Container,
-				SectionName = CurrentSectionName
-			})
 			table.insert(redzlib.AllElements, {
 				Type = "Toggle",
 				Name = TName,
@@ -4871,6 +4859,14 @@ function redzlib:MakeWindow(Configs)
 			end
 			
 			local Button, LabelFunc = ButtonFrame(Container, TName, TDesc, UDim2.new(1, -38))
+			SetLayoutOrder(Container, Button)
+			table.insert(redzlib.AllElements, {
+				Type = "TextBox",
+				Name = TName,
+				Instance = Button,
+				OriginalParent = Container,
+				SectionName = CurrentSectionName
+			})
 			
 			local SelectedFrame = InsertTheme(Create("Frame", Button, {
 				Size = UDim2.new(0, 150, 0, 18),
