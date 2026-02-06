@@ -3382,6 +3382,8 @@ local function GetColor(Instance)
 		return "BackgroundColor3"
 	elseif Instance:IsA("ImageLabel") then
 		return "ImageColor3"
+	elseif Instance:IsA("TextBox") or Instance:IsA("TextButton") then
+		return "TextColor3"
 	elseif Instance:IsA("TextLabel") then
 		return "TextColor3"
 	elseif Instance:IsA("ScrollingFrame") then
