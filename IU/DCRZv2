@@ -613,6 +613,18 @@ local redzlib = {
 			["Color Theme"] = Color3.fromRGB(255, 215, 115),
 			["Color Text"] = Color3.fromRGB(240, 248, 255),
 			["Color Dark Text"] = Color3.fromRGB(175, 190, 205)
+		},
+		SYNTRAXHub = {
+			["Color Hub 1"] = ColorSequence.new({
+				ColorSequenceKeypoint.new(0.00, Color3.fromRGB(10, 22, 40)),
+				ColorSequenceKeypoint.new(0.50, Color3.fromRGB(16, 32, 54)),
+				ColorSequenceKeypoint.new(1.00, Color3.fromRGB(10, 22, 40))
+			}),
+			["Color Hub 2"] = Color3.fromRGB(12, 26, 46),
+			["Color Stroke"] = Color3.fromRGB(24, 52, 86),
+			["Color Theme"] = Color3.fromRGB(0, 102, 204),
+			["Color Text"] = Color3.fromRGB(220, 235, 255),
+			["Color Dark Text"] = Color3.fromRGB(150, 178, 210)
 		}
 	},
 	Info = {
@@ -628,6 +640,7 @@ local redzlib = {
 	Instances = {},
 	Elements = {},
 	Options = {},
+	AllElements = {},
 	Flags = {},
 	Tabs = {},
 	Icons = (function()
@@ -3559,6 +3572,33 @@ function redzlib:MakeWindow(Configs)
 		ClipsDescendants = true,
 		Name = "Containers"
 	})
+
+	-- Search overlay container (hidden until search active)
+	local SearchContainer = InsertTheme(Create("ScrollingFrame", Components, {
+		Size = UDim2.new(1, -MainScroll.Size.X.Offset, 1, -TopBar.Size.Y.Offset),
+		AnchorPoint = Vector2.new(1, 1),
+		Position = UDim2.new(1, 0, 1, 0),
+		BackgroundTransparency = 1,
+		Visible = false,
+		ScrollBarThickness = 1.5,
+		ScrollBarImageTransparency = 0.2,
+		ScrollBarImageColor3 = Theme["Color Theme"],
+		AutomaticCanvasSize = "Y",
+		ScrollingDirection = "Y",
+		BorderSizePixel = 0,
+		CanvasSize = UDim2.new(),
+		Name = "SearchContainer"
+	}, {
+		Create("UIPadding", {
+			PaddingLeft = UDim.new(0, 10),
+			PaddingRight = UDim.new(0, 10),
+			PaddingTop = UDim.new(0, 10),
+			PaddingBottom = UDim.new(0, 10)
+		}), Create("UIListLayout", {
+			SortOrder = "LayoutOrder",
+			Padding = UDim.new(0, 5)
+		})
+	}), "ScrollBar")
 	
 	local ControlSize1, ControlSize2 = MakeDrag(Create("ImageButton", MainFrame, {
 		Size = UDim2.new(0, 35, 0, 35),
@@ -3583,6 +3623,7 @@ function redzlib:MakeWindow(Configs)
 		
 		MainScroll.Size = UDim2.new(0, ControlSize2.Position.X.Offset, 1, -TopBar.Size.Y.Offset)
 		Containers.Size = UDim2.new(1, -MainScroll.Size.X.Offset, 1, -TopBar.Size.Y.Offset)
+		SearchContainer.Size = Containers.Size
 		MainFrame.Size = ControlSize1.Position
 	end
 	
@@ -3620,11 +3661,91 @@ function redzlib:MakeWindow(Configs)
 		Image = "rbxassetid://10734896206",
 		Name = "Minimize"
 	})
+
+	local SearchButton = SetProps(CloseButton:Clone(), {
+		Position = UDim2.new(1, -60, 0.5),
+		Image = "rbxassetid://6031154871", -- magnifier
+		ImageColor3 = Theme["Color Text"],
+		Name = "Search",
+		Size = UDim2.new(0, 16, 0, 16)
+	})
+
+	-- Search input (hidden until toggled)
+	local SearchInputFrame = InsertTheme(Create("Frame", TopBar, {
+		Size = UDim2.new(0, 0, 0, 22),
+		Position = UDim2.new(1, -90, 0.5),
+		AnchorPoint = Vector2.new(1, 0.5),
+		BackgroundColor3 = Theme["Color Hub 2"],
+		ClipsDescendants = true
+	}), "Frame")
+	Make("Corner", SearchInputFrame, UDim.new(0, 4))
+	Make("Stroke", SearchInputFrame)
+
+	local SearchInput = InsertTheme(Create("TextBox", SearchInputFrame, {
+		Size = UDim2.new(1, -10, 1, 0),
+		Position = UDim2.new(0, 5, 0, 0),
+		BackgroundTransparency = 1,
+		Font = Enum.Font.Gotham,
+		PlaceholderText = "Search...",
+		TextColor3 = Theme["Color Text"],
+		TextSize = 11,
+		TextXAlignment = "Left",
+		Text = ""
+	}), "Text")
 	
 	SetChildren(ButtonsFolder, {
 		CloseButton,
-		MinimizeButton
+		MinimizeButton,
+		SearchButton
 	})
+
+	local SearchActive = false
+	local function UpdateSearch(Query)
+		Query = string.lower(Query or "")
+
+		-- Restore original parents
+		for _, ElementData in pairs(redzlib.AllElements) do
+			if ElementData.Instance and ElementData.OriginalParent and ElementData.Instance.Parent == SearchContainer then
+				ElementData.Instance.Parent = ElementData.OriginalParent
+				ElementData.Instance.Visible = true
+			end
+		end
+
+		if Query == "" then return end
+
+		for _, ElementData in pairs(redzlib.AllElements) do
+			local Name = string.lower(ElementData.Name or "")
+			local SectionName = ElementData.SectionName and string.lower(ElementData.SectionName) or ""
+			if string.find(Name, Query, 1, true) or (SectionName ~= "" and string.find(SectionName, Query, 1, true)) then
+				if ElementData.Instance then
+					ElementData.Instance.Parent = SearchContainer
+					ElementData.Instance.Visible = true
+				end
+			end
+		end
+	end
+
+	SearchButton.Activated:Connect(function()
+		SearchActive = not SearchActive
+		if SearchActive then
+			CreateTween({SearchInputFrame, "Size", UDim2.new(0, 140, 0, 22), 0.3})
+			SearchContainer.Visible = true
+			Containers.Visible = false
+			SearchInput:CaptureFocus()
+		else
+			CreateTween({SearchInputFrame, "Size", UDim2.new(0, 0, 0, 22), 0.3})
+			SearchInput.Text = ""
+			UpdateSearch("")
+			SearchContainer.Visible = false
+			Containers.Visible = true
+		end
+	end)
+
+	SearchInput:GetPropertyChangedSignal("Text"):Connect(function()
+		if SearchActive then
+			UpdateSearch(SearchInput.Text)
+		end
+	end)
 	
 	local Minimized, SaveSize, WaitClick
 	local Window, FirstTab = {}, false
@@ -3959,6 +4080,7 @@ function redzlib:MakeWindow(Configs)
 		
 		FirstTab = true
 		local Tab = {}
+		local CurrentSectionName = nil
 		table.insert(redzlib.Tabs, {TabInfo = {Name = TName, Icon = TIcon}, func = Tab, Cont = Container})
 		Tab.Cont = Container
 		
@@ -4001,6 +4123,13 @@ function redzlib:MakeWindow(Configs)
 			
 			local Section = {}
 			table.insert(redzlib.Options, {type = "Section", Name = SectionName, func = Section})
+			CurrentSectionName = SectionName
+			table.insert(redzlib.AllElements, {
+				Name = SectionName,
+				Instance = SectionFrame,
+				OriginalParent = Container,
+				SectionName = SectionName
+			})
 			function Section:Visible(Bool)
 				if Bool == nil then SectionFrame.Visible = not SectionFrame.Visible return end
 				SectionFrame.Visible = Bool
@@ -4020,6 +4149,12 @@ function redzlib:MakeWindow(Configs)
 			local PDesc = Configs[2] or Configs.Text or ""
 			
 			local Frame, LabelFunc = ButtonFrame(Container, PName, PDesc, UDim2.new(1, -20))
+			table.insert(redzlib.AllElements, {
+				Name = PName,
+				Instance = Frame,
+				OriginalParent = Container,
+				SectionName = CurrentSectionName
+			})
 			
 			local Paragraph = {}
 			function Paragraph:Visible(...) Funcs:ToggleVisible(Frame, ...) end
@@ -4054,6 +4189,13 @@ function redzlib:MakeWindow(Configs)
 				BackgroundTransparency = 1,
 				Image = "rbxassetid://10709791437"
 			})
+
+			table.insert(redzlib.AllElements, {
+				Name = BName,
+				Instance = FButton,
+				OriginalParent = Container,
+				SectionName = CurrentSectionName
+			})
 			
 			FButton.Activated:Connect(function()
 				Funcs:FireCallback(Callback)
@@ -4084,6 +4226,18 @@ function redzlib:MakeWindow(Configs)
 			if CheckFlag(Flag) then Default = GetFlag(Flag) end
 			
 			local Button, LabelFunc = ButtonFrame(Container, TName, TDesc, UDim2.new(1, -38))
+			table.insert(redzlib.AllElements, {
+				Name = TName,
+				Instance = Button,
+				OriginalParent = Container,
+				SectionName = CurrentSectionName
+			})
+			table.insert(redzlib.AllElements, {
+				Name = TName,
+				Instance = Button,
+				OriginalParent = Container,
+				SectionName = CurrentSectionName
+			})
 			
 			local ToggleHolder = InsertTheme(Create("Frame", Button, {
 				Size = UDim2.new(0, 35, 0, 18),
@@ -4160,6 +4314,12 @@ function redzlib:MakeWindow(Configs)
 			local Callback = Funcs:GetCallback(Configs, 4)
 			
 			local Button, LabelFunc = ButtonFrame(Container, DName, DDesc, UDim2.new(1, -180))
+			table.insert(redzlib.AllElements, {
+				Name = DName,
+				Instance = Button,
+				OriginalParent = Container,
+				SectionName = CurrentSectionName
+			})
 			
 			local SelectedFrame = InsertTheme(Create("Frame", Button, {
 				Size = UDim2.new(0, 150, 0, 18),
@@ -4511,6 +4671,12 @@ function redzlib:MakeWindow(Configs)
 			Min, Max = Min / Increase, Max / Increase
 			
 			local Button, LabelFunc = ButtonFrame(Container, SName, SDesc, UDim2.new(1, -180))
+			table.insert(redzlib.AllElements, {
+				Name = SName,
+				Instance = Button,
+				OriginalParent = Container,
+				SectionName = CurrentSectionName
+			})
 			
 			local SliderHolder = Create("TextButton", Button, {
 				Size = UDim2.new(0.45, 0, 1),
@@ -4727,6 +4893,13 @@ function redzlib:MakeWindow(Configs)
 				Position = UDim2.new(0, 0, 1),
 				BackgroundColor3 = Theme["Color Hub 2"]
 			}), "Frame")Make("Corner", FrameHolder)
+
+			table.insert(redzlib.AllElements, {
+				Name = Title,
+				Instance = InviteHolder,
+				OriginalParent = Container,
+				SectionName = CurrentSectionName
+			})
 			
 			local ImageLabel = Create("ImageLabel", FrameHolder, {
 				Size = UDim2.new(0, 30, 0, 30),
