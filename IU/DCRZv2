@@ -3742,12 +3742,13 @@ function redzlib:MakeWindow(Configs)
 		SearchContainer.Visible = true
 		Containers.Visible = false
 
+		local ActiveContainer = ActiveTab and ActiveTab.Cont
 		for _, ElementData in pairs(redzlib.AllElements) do
 			if ElementData.Instance then
-				local inVisited = ElementData.OriginalParent and VisitedTabs[ElementData.OriginalParent]
+				local inActive = ActiveContainer and ElementData.OriginalParent == ActiveContainer
 				local isAllowed = AllowedTypes[ElementData.Type] or false
 				local Name = string.lower(ElementData.Name or "")
-				local match = inVisited and isAllowed and string.find(Name, Query, 1, true)
+				local match = inActive and isAllowed and string.find(Name, Query, 1, true)
 				ElementData.Instance.Parent = match and SearchContainer or nil
 			end
 		end
