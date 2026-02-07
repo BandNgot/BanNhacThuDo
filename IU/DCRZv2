@@ -1451,8 +1451,6 @@ local redzlib = {
 			["xsquare"] = "rbxassetid://10747384217",
 			["zoomin"] = "rbxassetid://10747384552",
 			["zoomout"] = "rbxassetid://10747384679",
-		["system_update_alt"] = "rbxassetid://6031251515",
-		["open_with"] = "rbxassetid://6026568265",
 		["build_circle"] = "rbxassetid://6023426952",
 		["toc"] = "rbxassetid://6031229341",
 		["settings_phone"] = "rbxassetid://6031289445",
@@ -2912,6 +2910,8 @@ local redzlib = {
 		["fitness_center"] = "rbxassetid://6035121907",
 		["baby_changing_station"] = "rbxassetid://6035107930",
 		["fire_extinguisher"] = "rbxassetid://6035121913",
+		["system_update_alt"] = "rbxassetid://6031251515",
+		["open_with"] = "rbxassetid://6026568265",
 		["sparkle"] = "rbxassetid://4483362748"
 		}
 	end)()
@@ -5117,6 +5117,275 @@ function redzlib:MakeWindow(Configs)
 
 	print("Applying saved theme: " .. redzlib.Save.Theme)
 	redzlib:SetTheme(redzlib.Save.Theme, true)
+
+	-- ============== KEY SYSTEM FUNCTION ==============
+	function Window:AddKeySystem(Configs)
+		local KSTitle = Configs[1] or Configs.Title or "🔐 Key System"
+		local KSDesc = Configs[2] or Configs.Description or "Lấy key từ link bên dưới, sau đó nhập vào ô để sử dụng hub."
+		local KSKeyLink = Configs[3] or Configs.KeyLink or ""
+		local KSKeys = Configs[4] or Configs.Keys or {}
+		local KSSuccessMsg = Configs[5] or Configs.SuccessMsg or "✅ Key hợp lệ!"
+		local KSFailMsg = Configs[6] or Configs.FailMsg or "❌ Sai key!"
+		local KSCallback = Configs[7] or Configs.Callback or function()end
+		
+		local KSEnable = Configs.EnableKeySystem ~= false
+		local KSIcon = redzlib:GetIcon(Configs.Icon or "key")
+		if not KSIcon:find("rbxassetid://") or KSIcon:gsub("rbxassetid://", ""):len() < 6 then
+			KSIcon = "rbxassetid://10723416652"
+		end
+		
+		-- Tạo Section mới cho Key System (optional)
+		if self.AddSection then
+			self:AddSection({Name = KSTitle})
+		end
+		
+		-- Tìm Container hiện tại
+		local CurrentTab = redzlib.Tabs[#redzlib.Tabs]
+		if not CurrentTab or not CurrentTab.Cont then
+			return {UpdateStatus = function()end}
+		end
+		local Container = CurrentTab.Cont
+		
+		-- Key Info Frame
+		local KeyInfoFrame = Make("Button", Container, {
+			Size = UDim2.new(1, 0, 0, 80),
+			Name = "KeyInfo"
+		})Make("Corner", KeyInfoFrame, UDim.new(0, 6))
+		SetLayoutOrder(Container, KeyInfoFrame)
+		
+		local KeyIcon = InsertTheme(Create("ImageLabel", KeyInfoFrame, {
+			Size = UDim2.new(0, 40, 0, 40),
+			Position = UDim2.new(0, 10, 0.5, 0),
+			AnchorPoint = Vector2.new(0, 0.5),
+			Image = KSIcon,
+			BackgroundTransparency = 1
+		}), "Theme")
+		
+		local KeyTitle = InsertTheme(Create("TextLabel", KeyInfoFrame, {
+			Size = UDim2.new(1, -60, 0, 15),
+			Position = UDim2.new(0, 60, 0, 10),
+			Text = KSTitle,
+			TextColor3 = Theme["Color Text"],
+			Font = Enum.Font.GothamBold,
+			TextSize = 12,
+			BackgroundTransparency = 1,
+			TextXAlignment = "Left"
+		}), "Text")
+		
+		local KeyDesc = InsertTheme(Create("TextLabel", KeyInfoFrame, {
+			Size = UDim2.new(1, -60, 0, 30),
+			Position = UDim2.new(0, 60, 0, 25),
+			Text = KSDesc,
+			TextColor3 = Theme["Color Dark Text"],
+			Font = Enum.Font.Gotham,
+			TextSize = 10,
+			BackgroundTransparency = 1,
+			TextXAlignment = "Left",
+			TextWrapped = true
+		}), "DarkText")
+		
+		-- Status Label
+		local StatusLabel = InsertTheme(Create("TextLabel", KeyInfoFrame, {
+			Size = UDim2.new(1, -20, 0, 18),
+			Position = UDim2.new(0, 10, 1, -22),
+			Text = KSEnable and "❌ Chưa nhập key!" or "✅ Key không bắt buộc!",
+			TextColor3 = KSEnable and Color3.fromRGB(255, 100, 100) or Color3.fromRGB(100, 255, 100),
+			Font = Enum.Font.GothamBold,
+			TextSize = 11,
+			BackgroundTransparency = 1,
+			TextXAlignment = "Left"
+		}), "Text")
+		
+		-- Key Input Frame
+		local KeyInputFrame = Make("Button", Container, {
+			Size = UDim2.new(1, 0, 0, 45),
+			Name = "KeyInput"
+		})Make("Corner", KeyInputFrame, UDim.new(0, 6))
+		SetLayoutOrder(Container, KeyInputFrame)
+		
+		local KeyInputLabel = InsertTheme(Create("TextLabel", KeyInputFrame, {
+			Size = UDim2.new(1, -20, 0, 15),
+			Position = UDim2.new(0, 10, 0, 8),
+			Text = "Nhập key của bạn:",
+			TextColor3 = Theme["Color Text"],
+			Font = Enum.Font.GothamMedium,
+			TextSize = 11,
+			BackgroundTransparency = 1,
+			TextXAlignment = "Left"
+		}), "Text")
+		
+		local KeyInput = InsertTheme(Create("TextBox", KeyInputFrame, {
+			Size = UDim2.new(1, -20, 0, 22),
+			Position = UDim2.new(0, 10, 0, 23),
+			PlaceholderText = "Dán key vào đây...",
+			TextColor3 = Theme["Color Text"],
+			TextXAlignment = "Left",
+			Font = Enum.Font.Gotham,
+			TextSize = 11,
+			BackgroundColor3 = Theme["Color Hub 2"]
+		}), "Frame")
+		Make("Corner", KeyInput, UDim.new(0, 4))
+		Make("Stroke", KeyInput)
+		
+		-- Get Key Button
+		local GetKeyBtn = Make("Button", Container, {
+			Size = UDim2.new(1, 0, 0, 30),
+			Name = "GetKeyButton"
+		})Make("Corner", GetKeyBtn, UDim.new(0, 6))
+		SetLayoutOrder(Container, GetKeyBtn)
+		
+		local GetKeyIcon = InsertTheme(Create("ImageLabel", GetKeyBtn, {
+			Size = UDim2.new(0, 16, 0, 16),
+			Position = UDim2.new(0, 12, 0.5, 0),
+			AnchorPoint = Vector2.new(0, 0.5),
+			Image = "rbxassetid://10723344270",
+			BackgroundTransparency = 1
+		}), "Theme")
+		
+		local GetKeyLabel = InsertTheme(Create("TextLabel", GetKeyBtn, {
+			Size = UDim2.new(1, -40, 1, 0),
+			Position = UDim2.new(0, 35, 0, 0),
+			Text = "📋 Lấy Key tại đây",
+			TextColor3 = Theme["Color Text"],
+			Font = Enum.Font.GothamBold,
+			TextSize = 11,
+			BackgroundTransparency = 1,
+			TextXAlignment = "Left"
+		}), "Text")
+		
+		-- Submit Key Button
+		local SubmitKeyBtn = Make("Button", Container, {
+			Size = UDim2.new(1, 0, 0, 30),
+			Name = "SubmitKeyButton"
+		})Make("Corner", SubmitKeyBtn, UDim.new(0, 6))
+		SetLayoutOrder(Container, SubmitKeyBtn)
+		
+		local SubmitKeyIcon = InsertTheme(Create("ImageLabel", SubmitKeyBtn, {
+			Size = UDim2.new(0, 16, 0, 16),
+			Position = UDim2.new(0, 12, 0.5, 0),
+			AnchorPoint = Vector2.new(0, 0.5),
+			Image = "rbxassetid://10709790644",
+			BackgroundTransparency = 1
+		}), "Theme")
+		
+		local SubmitKeyLabel = InsertTheme(Create("TextLabel", SubmitKeyBtn, {
+			Size = UDim2.new(1, -40, 1, 0),
+			Position = UDim2.new(0, 35, 0, 0),
+			Text = "✅ Xác nhận Key",
+			TextColor3 = Theme["Color Text"],
+			Font = Enum.Font.GothamBold,
+			TextSize = 11,
+			BackgroundTransparency = 1,
+			TextXAlignment = "Left"
+		}), "Text")
+		
+		-- Key System State
+		local IsKeyValid = false
+		
+		-- Update Status Function
+		local function UpdateKeyStatus(IsValid, Message)
+			IsKeyValid = IsValid
+			StatusLabel.Text = Message
+			StatusLabel.TextColor3 = IsValid and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(255, 100, 100)
+			
+			local TargetColor = IsValid and Theme["Color Theme"] or Theme["Color Stroke"]
+			CreateTween({KeyInfoFrame, "BackgroundColor3", TargetColor, 0.3})
+			CreateTween({KeyInputFrame, "BackgroundColor3", TargetColor, 0.3})
+		end
+		
+		-- Nút Lấy Key
+		GetKeyBtn.Activated:Connect(function()
+			if KSKeyLink and KSKeyLink ~= "" then
+				setclipboard(KSKeyLink)
+				Window:Notify({
+					Title = "📋 Link Key",
+					Text = "Đã copy link vào clipboard!",
+					Duration = 3,
+					Type = "Info"
+				})
+			else
+				Window:Notify({
+					Title = "⚠️ Thông báo",
+					Text = "Chưa cấu hình link key!",
+					Duration = 3,
+					Type = "Warning"
+				})
+			end
+		end)
+		
+		-- Nút Xác nhận Key
+		SubmitKeyBtn.Activated:Connect(function()
+			local InputKey = KeyInput.Text:gsub("%s+", "")
+			
+			if InputKey == "" then
+				UpdateKeyStatus(false, KSFailMsg)
+				return
+			end
+			
+			local KeyFound = false
+			for _, ValidKey in ipairs(KSKeys) do
+				if InputKey == ValidKey then
+					KeyFound = true
+					break
+				end
+			end
+			
+			if KeyFound then
+				UpdateKeyStatus(true, KSSuccessMsg)
+				KeyInput.Text = ""
+				Window:Notify({
+					Title = "✅ Thành công",
+					Text = KSSuccessMsg,
+					Duration = 5,
+					Type = "Success"
+				})
+				task.spawn(KSCallback, true)
+			else
+				UpdateKeyStatus(false, KSFailMsg)
+				task.spawn(KSCallback, false)
+			end
+		end)
+		
+		-- Initialize status
+		if not KSEnable then
+			UpdateKeyStatus(true, "✅ Key không bắt buộc!")
+		else
+			UpdateKeyStatus(false, "❌ Chưa nhập key!")
+		end
+		
+		-- Return KeySystem object
+		local KeySystem = {}
+		function KeySystem:UpdateStatus(IsValid, Message)
+			UpdateKeyStatus(IsValid, Message)
+		end
+		function KeySystem:SetKeys(NewKeys)
+			KSKeys = NewKeys or {}
+		end
+		function KeySystem:GetKeyLink()
+			return KSKeyLink
+		end
+		function KeySystem:IsValid()
+			return IsKeyValid
+		end
+		function KeySystem:OpenLink()
+			if KSKeyLink and KSKeyLink ~= "" then
+				setclipboard(KSKeyLink)
+				Window:Notify({
+					Title = "📋 Link Key",
+					Text = "Đã copy link vào clipboard!",
+					Duration = 3,
+					Type = "Info"
+				})
+			end
+		end
+		function KeySystem:Destroy()
+			KeyInfoFrame:Destroy()
+			KeyInputFrame:Destroy()
+			GetKeyBtn:Destroy()
+			SubmitKeyBtn:Destroy()
+		end
+		return KeySystem
+	end
 
 	return Window
 end
