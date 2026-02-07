@@ -613,22 +613,10 @@ local redzlib = {
 			["Color Theme"] = Color3.fromRGB(255, 215, 115),
 			["Color Text"] = Color3.fromRGB(240, 248, 255),
 			["Color Dark Text"] = Color3.fromRGB(175, 190, 205)
-		},
-		SYNTRAXHub = {
-			["Color Hub 1"] = ColorSequence.new({
-				ColorSequenceKeypoint.new(0.00, Color3.fromRGB(10, 22, 40)),
-				ColorSequenceKeypoint.new(0.50, Color3.fromRGB(16, 32, 54)),
-				ColorSequenceKeypoint.new(1.00, Color3.fromRGB(10, 22, 40))
-			}),
-			["Color Hub 2"] = Color3.fromRGB(12, 26, 46),
-			["Color Stroke"] = Color3.fromRGB(24, 52, 86),
-			["Color Theme"] = Color3.fromRGB(0, 102, 204),
-			["Color Text"] = Color3.fromRGB(220, 235, 255),
-			["Color Dark Text"] = Color3.fromRGB(150, 178, 210)
 		}
 	},
 	Info = {
-		Version = "1.1.0"
+		Version = "1.1.1"
 	},
 	Save = {
 		UISize = {550, 380},
@@ -3241,365 +3229,6 @@ end
 
 local Theme = redzlib.Themes[redzlib.Save.Theme]
 
--- Advanced key system (optional). Call redzlib:KeySystem({KeySystem=true, Title=..., Description=..., KeyLink=..., Keys={"KEY1"}, Notify={Success="...", Fail="..."}})
-function redzlib:KeySystem(Configs)
-	if not Configs or not Configs.KeySystem then return true end
-	local CoreGui = game:GetService("CoreGui")
-	local keys = {}
-	for _,k in ipairs(Configs.Keys or {}) do
-		keys[tostring(k)] = true
-	end
-
-	local ev = Instance.new("BindableEvent")
-	local result = false
-
-	local sg = Instance.new("ScreenGui")
-	sg.Name = "redz_KeySystem"
-	sg.IgnoreGuiInset = true
-	sg.ResetOnSpawn = false
-	sg.Parent = CoreGui
-
-	-- Background overlay with blur effect simulation
-	local overlay = Instance.new("Frame")
-	overlay.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
-	overlay.BackgroundTransparency = 0.85
-	overlay.Size = UDim2.new(1, 0, 1, 0)
-	overlay.ZIndex = 0
-	overlay.Parent = sg
-
-	-- Main container with glass effect
-	local mainContainer = Instance.new("Frame")
-	mainContainer.Size = UDim2.fromOffset(420, 280)
-	mainContainer.AnchorPoint = Vector2.new(0.5, 0.5)
-	mainContainer.Position = UDim2.fromScale(0.5, 0.5)
-	mainContainer.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-	mainContainer.BorderSizePixel = 0
-	mainContainer.ClipsDescendants = true
-	mainContainer.Parent = sg
-
-	-- Gradient background
-	local gradient = Instance.new("UIGradient")
-	gradient.Color = ColorSequence.new({
-		ColorSequenceKeypoint.new(0, Color3.fromRGB(25, 25, 35)),
-		ColorSequenceKeypoint.new(0.5, Color3.fromRGB(35, 35, 50)),
-		ColorSequenceKeypoint.new(1, Color3.fromRGB(25, 25, 35))
-	})
-	gradient.Rotation = 45
-	gradient.Parent = mainContainer
-
-	-- Inner glow border
-	local innerBorder = Instance.new("Frame")
-	innerBorder.Size = UDim2.new(1, -4, 1, -4)
-	innerBorder.Position = UDim2.new(0, 2, 0, 2)
-	innerBorder.AnchorPoint = Vector2.new(0.5, 0.5)
-	innerBorder.Position = UDim2.new(0.5, 0, 0.5, 0)
-	innerBorder.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-	innerBorder.BackgroundTransparency = 0.7
-	innerBorder.BorderSizePixel = 0
-	innerBorder.Parent = mainContainer
-
-	-- Title section with icon
-	local titleContainer = Instance.new("Frame")
-	titleContainer.Size = UDim2.new(1, -40, 0, 50)
-	titleContainer.Position = UDim2.new(0, 20, 0, 15)
-	titleContainer.BackgroundTransparency = 1
-	titleContainer.Parent = mainContainer
-
-	-- Lock icon
-	local lockIcon = Instance.new("ImageLabel")
-	lockIcon.Size = UDim2.fromOffset(32, 32)
-	lockIcon.Position = UDim2.new(0, 0, 0.5, -16)
-	lockIcon.BackgroundTransparency = 1
-	lockIcon.Image = "rbxassetid://10747374003" -- lock icon
-	lockIcon.ImageColor3 = Theme["Color Theme"] or Color3.fromRGB(88, 101, 242)
-	lockIcon.Parent = titleContainer
-
-	-- Main title
-	local title = Instance.new("TextLabel")
-	title.Size = UDim2.new(1, -40, 0, 24)
-	title.Position = UDim2.new(0, 38, 0, 0)
-	title.BackgroundTransparency = 1
-	title.Font = Enum.Font.GothamBold
-	title.TextSize = 18
-	title.TextColor3 = Theme["Color Text"] or Color3.fromRGB(243, 243, 243)
-	title.TextXAlignment = Enum.TextXAlignment.Left
-	title.Text = Configs.Title or "🔐 KEY AUTHORIZATION"
-	title.Parent = titleContainer
-
-	-- Subtitle/Description
-	local desc = Instance.new("TextLabel")
-	desc.Size = UDim2.new(1, -40, 0, 36)
-	desc.Position = UDim2.new(0, 38, 0, 24)
-	desc.BackgroundTransparency = 1
-	desc.Font = Enum.Font.Gotham
-	desc.TextSize = 12
-	desc.TextWrapped = true
-	desc.TextColor3 = Theme["Color Dark Text"] or Color3.fromRGB(180, 180, 180)
-	desc.TextXAlignment = Enum.TextXAlignment.Left
-	desc.TextYAlignment = Enum.TextYAlignment.Top
-	desc.Text = Configs.Description or "Enter your access key to unlock all premium features. Contact support if you need assistance."
-	desc.Parent = titleContainer
-
-	-- Divider line
-	local divider = Instance.new("Frame")
-	divider.Size = UDim2.new(1, -40, 0, 1)
-	divider.Position = UDim2.new(0, 20, 0, 95)
-	divider.BackgroundColor3 = Color3.fromRGB(80, 80, 100)
-	divider.BackgroundTransparency = 0.5
-	divider.BorderSizePixel = 0
-	divider.Parent = mainContainer
-
-	-- Key input container
-	local inputContainer = Instance.new("Frame")
-	inputContainer.Size = UDim2.new(1, -40, 0, 55)
-	inputContainer.Position = UDim2.new(0, 20, 0, 110)
-	inputContainer.BackgroundTransparency = 1
-	inputContainer.Parent = mainContainer
-
-	-- Input label
-	local inputLabel = Instance.new("TextLabel")
-	inputLabel.Size = UDim2.new(1, 0, 0, 16)
-	inputLabel.Position = UDim2.new(0, 0, 0, 0)
-	inputLabel.BackgroundTransparency = 1
-	inputLabel.Font = Enum.Font.GothamSemibold
-	inputLabel.TextSize = 11
-	inputLabel.TextColor3 = Theme["Color Dark Text"] or Color3.fromRGB(160, 160, 160)
-	inputLabel.TextXAlignment = Enum.TextXAlignment.Left
-	inputLabel.Text = "ACCESS KEY"
-	inputLabel.Parent = inputContainer
-
-	-- Input box with glow effect
-	local inputBox = Instance.new("Frame")
-	inputBox.Size = UDim2.new(1, 0, 0, 36)
-	inputBox.Position = UDim2.new(0, 0, 0, 19)
-	inputBox.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
-	inputBox.BorderSizePixel = 0
-	inputBox.Parent = inputContainer
-
-	-- Input border glow
-	local inputBorder = Instance.new("UIGradient")
-	inputBorder.Color = ColorSequence.new({
-		ColorSequenceKeypoint.new(0, Color3.fromRGB(50, 50, 70)),
-		ColorSequenceKeypoint.new(0.5, Color3.fromRGB(70, 70, 100)),
-		ColorSequenceKeypoint.new(1, Color3.fromRGB(50, 50, 70))
-	})
-	inputBorder.Rotation = 45
-	inputBorder.Parent = inputBox
-
-	-- Inner input
-	local box = Instance.new("TextBox")
-	box.Size = UDim2.new(1, -4, 1, -4)
-	box.Position = UDim2.new(0, 2, 0, 2)
-	box.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-	box.BorderSizePixel = 0
-	box.Font = Enum.Font.GothamSemibold
-	box.TextSize = 14
-	box.TextColor3 = Theme["Color Text"] or Color3.fromRGB(243, 243, 243)
-	box.PlaceholderText = "XXXX-XXXX-XXXX-XXXX"
-	box.PlaceholderColor3 = Color3.fromRGB(100, 100, 120)
-	box.Text = ""
-	box.Parent = inputBox
-
-	-- Status display
-	local status = Instance.new("TextLabel")
-	status.Size = UDim2.new(1, 0, 0, 18)
-	status.Position = UDim2.new(0, 0, 1, -18)
-	status.BackgroundTransparency = 1
-	status.Font = Enum.Font.Gotham
-	status.TextSize = 11
-	status.TextColor3 = Color3.fromRGB(255, 100, 100)
-	status.TextXAlignment = Enum.TextXAlignment.Center
-	status.Text = ""
-	status.Parent = inputContainer
-
-	local function setStatus(msg, ok, animated)
-		status.Text = msg
-		if ok then
-			status.TextColor3 = Color3.fromRGB(100, 255, 150)
-		else
-			status.TextColor3 = Color3.fromRGB(255, 100, 100)
-		end
-		if animated then
-			CreateTween({status, "TextTransparency", 0, 0.15})
-		end
-	end
-
-	local function checkKey(k)
-		return keys[tostring(k)] == true
-	end
-
-	-- Button container
-	local buttonContainer = Instance.new("Frame")
-	buttonContainer.Size = UDim2.new(1, -40, 0, 44)
-	buttonContainer.Position = UDim2.new(0, 20, 1, -64)
-	buttonContainer.BackgroundTransparency = 1
-	buttonContainer.Parent = mainContainer
-
-	-- Submit button
-	local submit = Instance.new("TextButton")
-	submit.Size = UDim2.new(0.57, -6, 0, 38)
-	submit.Position = UDim2.new(0, 0, 0.5, -19)
-	submit.BackgroundColor3 = Theme["Color Theme"] or Color3.fromRGB(88, 101, 242)
-	submit.BorderSizePixel = 0
-	submit.TextColor3 = Color3.fromRGB(255, 255, 255)
-	submit.Font = Enum.Font.GothamBold
-	submit.TextSize = 13
-	submit.Text = "✓ VERIFY KEY"
-	submit.AutoButtonColor = false
-	submit.Parent = buttonContainer
-
-	-- Submit button gradient overlay
-	local submitGradient = Instance.new("UIGradient")
-	submitGradient.Color = ColorSequence.new({
-		ColorSequenceKeypoint.new(0, Color3.fromRGB(70, 85, 220)),
-		ColorSequenceKeypoint.new(1, Color3.fromRGB(88, 101, 242))
-	})
-	submitGradient.Rotation = 45
-	submitGradient.Parent = submit
-
-	-- Get key button
-	local getkey = Instance.new("TextButton")
-	getkey.Size = UDim2.new(0.4, -6, 0, 38)
-	getkey.Position = UDim2.new(0.605, 6, 0.5, -19)
-	getkey.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
-	getkey.BorderSizePixel = 0
-	getkey.TextColor3 = Theme["Color Text"] or Color3.fromRGB(243, 243, 243)
-	getkey.Font = Enum.Font.GothamBold
-	getkey.TextSize = 13
-	getkey.Text = "📋 COPY KEY"
-	getkey.AutoButtonColor = false
-	getkey.Parent = buttonContainer
-
-	-- Hover effects
-	local function addHoverEffect(button, normalColor, hoverColor)
-		button.MouseEnter:Connect(function()
-			CreateTween({button, "BackgroundColor3", hoverColor, 0.2})
-		end)
-		button.MouseLeave:Connect(function()
-			CreateTween({button, "BackgroundColor3", normalColor, 0.2})
-		end)
-	end
-
-	addHoverEffect(submit, Theme["Color Theme"] or Color3.fromRGB(88, 101, 242), Color3.fromRGB(100, 115, 255))
-	addHoverEffect(getkey, Color3.fromRGB(50, 50, 70), Color3.fromRGB(70, 70, 90))
-
-	-- Key icon for getkey button
-	local getkeyIcon = Instance.new("ImageLabel")
-	getkeyIcon.Size = UDim2.fromOffset(16, 16)
-	getkeyIcon.Position = UDim2.new(0, 10, 0.5, -8)
-	getkeyIcon.BackgroundTransparency = 1
-	getkeyIcon.Image = "rbxassetid://10723344270" -- download/copy icon
-	getkeyIcon.ImageColor3 = Color3.fromRGB(200, 200, 200)
-	getkeyIcon.Parent = getkey
-
-	-- Adjust text position for icon
-	local getkeyLabel = getkey:FindFirstChildOfClass("TextLabel") or getkey
-	getkeyLabel.Position = UDim2.new(0, 32, 0.5, -9)
-
-	-- Button click effects
-	submit.MouseButton1Down:Connect(function()
-		CreateTween({submit, "Size", UDim2.new(0.57, -8, 0, 36), 0.1})
-		CreateTween({submit, "Position", UDim2.new(0, 2, 0.5, -18), 0.1})
-	end)
-
-	submit.MouseButton1Up:Connect(function()
-		CreateTween({submit, "Size", UDim2.new(0.57, -6, 0, 38), 0.1})
-		CreateTween({submit, "Position", UDim2.new(0, 0, 0.5, -19), 0.1})
-	end)
-
-	getkey.MouseButton1Down:Connect(function()
-		CreateTween({getkey, "Size", UDim2.new(0.4, -8, 0, 36), 0.1})
-		CreateTween({getkey, "Position", UDim2.new(0.605, 8, 0.5, -18), 0.1})
-	end)
-
-	getkey.MouseButton1Up:Connect(function()
-		CreateTween({getkey, "Size", UDim2.new(0.4, -6, 0, 38), 0.1})
-		CreateTween({getkey, "Position", UDim2.new(0.605, 6, 0.5, -19), 0.1})
-	end)
-
-	-- Button actions
-	getkey.MouseButton1Click:Connect(function()
-		if setclipboard and Configs.KeyLink then
-			setclipboard(Configs.KeyLink)
-			setStatus("Link copied to clipboard!", true, true)
-		else
-			setStatus("Unable to copy link", false, true)
-		end
-	end)
-
-	submit.MouseButton1Click:Connect(function()
-		local inputKey = box.Text:gsub("%s", "") -- Remove spaces
-		if inputKey == "" then
-			setStatus("Please enter a valid key", false, true)
-			return
-		end
-		
-		local ok = checkKey(inputKey)
-		if ok then
-			setStatus("✓ Access granted! Welcome aboard.", true, true)
-			-- Success animation
-			CreateTween({submit, "BackgroundColor3", Color3.fromRGB(0, 200, 100), 0.3})
-			submit.Text = "✓ AUTHORIZED"
-			task.wait(0.5)
-			result = true
-			ev:Fire()
-		else
-			setStatus("✗ Invalid key. Please try again.", false, true)
-			-- Error animation
-			CreateTween({mainContainer, "Position", UDim2.fromScale(0.5, 0.5) + UDim2.new(0, 5, 0, 0), 0.05})
-			CreateTween({mainContainer, "Position", UDim2.fromScale(0.5, 0.5) - UDim2.new(0, 5, 0, 0), 0.05})
-			CreateTween({mainContainer, "Position", UDim2.fromScale(0.5, 0.5), 0.05})
-			box.Text = ""
-			box:CaptureFocus()
-		end
-	end)
-
-	-- Focus effects for input box
-	box.Focused:Connect(function()
-		CreateTween({inputBox, "BackgroundColor3", Color3.fromRGB(30, 30, 45), 0.2})
-		CreateTween({inputBorder, "Color", ColorSequence.new({
-			ColorSequenceKeypoint.new(0, Color3.fromRGB(80, 80, 130)),
-			ColorSequenceKeypoint.new(0.5, Color3.fromRGB(100, 100, 180)),
-			ColorSequenceKeypoint.new(1, Color3.fromRGB(80, 80, 130))
-		}), 0.2})
-	end)
-
-	box.FocusLost:Connect(function()
-		CreateTween({inputBox, "BackgroundColor3", Color3.fromRGB(20, 20, 30), 0.2})
-		CreateTween({inputBorder, "Color", ColorSequence.new({
-			ColorSequenceKeypoint.new(0, Color3.fromRGB(50, 50, 70)),
-			ColorSequenceKeypoint.new(0.5, Color3.fromRGB(70, 70, 100)),
-			ColorSequenceKeypoint.new(1, Color3.fromRGB(50, 50, 70))
-		}), 0.2})
-	end)
-
-	-- Enter key support
-	box.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.Keyboard then
-			if input.KeyCode == Enum.KeyCode.Return or input.KeyCode == Enum.KeyCode.Enter then
-				submit:FireButton()
-			end
-		end
-	end)
-
-	-- Entrance animation
-	mainContainer.Size = UDim2.fromOffset(420, 0)
-	CreateTween({mainContainer, "Size", UDim2.fromOffset(420, 280), 0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out})
-	CreateTween({overlay, "BackgroundTransparency", 0.7, 0.3})
-
-	-- Wait for result
-	ev.Event:Wait()
-	
-	-- Exit animation
-	CreateTween({mainContainer, "Size", UDim2.fromOffset(420, 0), 0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In})
-	CreateTween({mainContainer, "BackgroundTransparency", 1, 0.2})
-	CreateTween({overlay, "BackgroundTransparency", 1, 0.2})
-	task.wait(0.35)
-	
-	sg:Destroy()
-	return result
-end
-
 local function AddEle(Name, Func)
 	redzlib.Elements[Name] = Func
 end
@@ -3815,12 +3444,6 @@ function redzlib:SetScale(NewScale)
 end
 
 function redzlib:MakeWindow(Configs)
-	-- Optional key gate
-	if Configs.KeySystem and Configs.KeySystem.KeySystem then
-		local ok = redzlib:KeySystem(Configs.KeySystem)
-		if not ok then return end
-	end
-
 	local WTitle = Configs[1] or Configs.Name or Configs.Title or "redz Library V5"
 	local WMiniText = Configs[2] or Configs.SubTitle or "by : redz9999"
 	
@@ -4320,48 +3943,180 @@ function redzlib:MakeWindow(Configs)
 	function Window:Notify(Configs)
 		local NTitle = Configs[1] or Configs.Title or "Notification"
 		local NText = Configs[2] or Configs.Text or ""
-		local NDuration = Configs[3] or Configs.Duration or 5
+		local NDuration = Configs[3] or Configs.Duration or 4
 		local NType = Configs[4] or Configs.Type or "Info"
 
+		-- Color schemes for different notification types
 		local colors = {
-			Info = Theme["Color Theme"],
-			Success = Color3.fromRGB(0, 255, 0),
-			Warning = Color3.fromRGB(255, 255, 0),
-			Error = Color3.fromRGB(255, 0, 0)
+			Info = {
+				Primary = Theme["Color Theme"] or Color3.fromRGB(88, 101, 242),
+				Light = Color3.fromRGB(130, 140, 255),
+				Glow = Color3.fromRGB(60, 70, 180)
+			},
+			Success = {
+				Primary = Color3.fromRGB(0, 200, 83),
+				Light = Color3.fromRGB(50, 230, 100),
+				Glow = Color3.fromRGB(0, 150, 60)
+			},
+			Warning = {
+				Primary = Color3.fromRGB(255, 193, 7),
+				Light = Color3.fromRGB(255, 220, 80),
+				Glow = Color3.fromRGB(200, 150, 0)
+			},
+			Error = {
+				Primary = Color3.fromRGB(239, 83, 80),
+				Light = Color3.fromRGB(255, 120, 120),
+				Glow = Color3.fromRGB(180, 50, 50)
+			}
 		}
 
-		local NotifyFrame = Create("Frame", ScreenGui, {
-			Size = UDim2.new(0, 300, 0, 80),
-			Position = UDim2.new(1, -320, 0, 10),
-			BackgroundColor3 = Theme["Color Hub 2"],
-			BackgroundTransparency = 0.1
-		})Make("Corner", NotifyFrame)Make("Stroke", NotifyFrame)
+		local scheme = colors[NType] or colors.Info
 
+		-- Main container with glass effect
+		local NotifyFrame = Create("Frame", ScreenGui, {
+			Size = UDim2.new(0, 320, 0, 90),
+			Position = UDim2.new(1, -340, 0, 20),
+			BackgroundColor3 = Theme["Color Hub 2"] or Color3.fromRGB(35, 35, 40),
+			BackgroundTransparency = 0.3,
+			ClipsDescendants = true
+		})Make("Corner", NotifyFrame, UDim.new(0, 12))
+
+		-- Gradient overlay for depth
+		local Gradient = Create("UIGradient", NotifyFrame, {
+			Color = ColorSequence.new({
+				ColorSequenceKeypoint.new(0, (Theme["Color Hub 1"] and Theme["Color Hub 1"].Keypoints[1].Value) or Color3.fromRGB(45, 45, 50)),
+				ColorSequenceKeypoint.new(1, (Theme["Color Hub 1"] and Theme["Color Hub 1"].Keypoints[2].Value) or Color3.fromRGB(35, 35, 40))
+			}),
+			Rotation = 45,
+			Transparency = NumberSequence.new({
+				NumberSequenceKeypoint.new(0, 0.4),
+				NumberSequenceKeypoint.new(1, 0.5)
+			})
+		})
+
+		-- Left accent bar with glowing effect
+		local AccentBar = Create("Frame", NotifyFrame, {
+			Size = UDim2.new(0, 4, 1, 0),
+			BackgroundColor3 = scheme.Primary,
+			BackgroundTransparency = 0.1
+		})
+
+		-- Glow effect behind accent bar
+		local AccentGlow = Create("Frame", NotifyFrame, {
+			Size = UDim2.new(0, 8, 1, 0),
+			Position = UDim2.new(0, 2, 0, 0),
+			BackgroundColor3 = scheme.Glow,
+			BackgroundTransparency = 0.6,
+			ClipsDescendants = true
+		})Make("Corner", AccentGlow, UDim.new(0, 4))
+
+		-- Icon container
+		local IconContainer = Create("Frame", NotifyFrame, {
+			Size = UDim2.new(0, 44, 0, 44),
+			Position = UDim2.new(0, 20, 0, 23),
+			BackgroundColor3 = scheme.Primary,
+			BackgroundTransparency = 0.9
+		})Make("Corner", IconContainer, UDim.new(0, 10))
+
+		-- Icon based on type
+		local icons = {
+			Info = "rbxassetid://10723415903", -- info icon
+			Success = "rbxassetid://10709790644", -- check icon
+			Warning = "rbxassetid://10709753149", -- alert triangle
+			Error = "rbxassetid://10709753064" -- alert octagon
+		}
+
+		local Icon = Create("ImageLabel", IconContainer, {
+			Size = UDim2.new(0, 24, 0, 24),
+			Position = UDim2.new(0.5, 0, 0.5, 0),
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Image = icons[NType] or icons.Info,
+			ImageColor3 = scheme.Light,
+			BackgroundTransparency = 1
+		})
+
+		-- Title label
 		local TitleLabel = InsertTheme(Create("TextLabel", NotifyFrame, {
-			Size = UDim2.new(1, -10, 0, 20),
-			Position = UDim2.new(0, 5, 0, 5),
+			Size = UDim2.new(1, -85, 0, 22),
+			Position = UDim2.new(0, 75, 0, 20),
 			Text = NTitle,
-			TextColor3 = colors[NType] or Theme["Color Text"],
+			TextColor3 = scheme.Light,
 			Font = Enum.Font.GothamBold,
 			TextSize = 14,
+			TextXAlignment = "Left",
 			BackgroundTransparency = 1
 		}), "Text")
 
+		-- Text label with better wrapping
 		local TextLabel = InsertTheme(Create("TextLabel", NotifyFrame, {
-			Size = UDim2.new(1, -10, 0, 40),
-			Position = UDim2.new(0, 5, 0, 25),
+			Size = UDim2.new(1, -85, 0, 40),
+			Position = UDim2.new(0, 75, 0, 42),
 			Text = NText,
-			TextColor3 = Theme["Color Dark Text"],
+			TextColor3 = Theme["Color Dark Text"] or Color3.fromRGB(180, 180, 180),
 			Font = Enum.Font.Gotham,
 			TextSize = 12,
+			TextXAlignment = "Left",
 			TextWrapped = true,
+			TextYAlignment = "Top",
 			BackgroundTransparency = 1
 		}), "DarkText")
 
-		CreateTween({NotifyFrame, "Position", UDim2.new(1, -10, 0, 10), 0.5})
-		task.wait(NDuration)
-		CreateTween({NotifyFrame, "Position", UDim2.new(1, -320, 0, 10), 0.5, true})
-		NotifyFrame:Destroy()
+		-- Progress bar at bottom
+		local ProgressContainer = Create("Frame", NotifyFrame, {
+			Size = UDim2.new(1, -20, 0, 3),
+			Position = UDim2.new(0.5, 0, 1, -8),
+			AnchorPoint = Vector2.new(0.5, 1),
+			BackgroundColor3 = Color3.fromRGB(60, 60, 60),
+			BackgroundTransparency = 0.5
+		})Make("Corner", ProgressContainer, UDim.new(0, 2))
+
+		local ProgressBar = Create("Frame", ProgressContainer, {
+			Size = UDim2.new(1, 0, 1, 0),
+			BackgroundColor3 = scheme.Primary,
+			BackgroundTransparency = 0.2
+		})Make("Corner", ProgressBar, UDim.new(0, 2))
+
+		-- Subtle close button
+		local CloseBtn = Create("ImageButton", NotifyFrame, {
+			Size = UDim2.new(0, 18, 0, 18),
+			Position = UDim2.new(1, -15, 0, 10),
+			AnchorPoint = Vector2.new(1, 0),
+			Image = "rbxassetid://10747384394",
+			ImageColor3 = Color3.fromRGB(150, 150, 150),
+			BackgroundTransparency = 1,
+			AutoButtonColor = false
+		})
+
+		-- Hover effect for close button
+		CloseBtn.MouseEnter:Connect(function()
+			CreateTween({CloseBtn, "ImageColor3", scheme.Light, 0.2})
+		end)
+		CloseBtn.MouseLeave:Connect(function()
+			CreateTween({CloseBtn, "ImageColor3", Color3.fromRGB(150, 150, 150), 0.2})
+		end)
+		CloseBtn.MouseButton1Click:Connect(function()
+			task.cancel(progressTask)
+			CreateTween({NotifyFrame, "Position", UDim2.new(1, -340, 0, 20), 0.35, true})
+			CreateTween({NotifyFrame, "BackgroundTransparency", 1, 0.35, true})
+			task.wait(0.35)
+			NotifyFrame:Destroy()
+		end)
+
+		-- Entry animation
+		CreateTween({NotifyFrame, "Position", UDim2.new(1, -20, 0, 20), 0.45, EasingStyle = Enum.EasingStyle.Back, EasingDirection = Enum.EasingDirection.Out})
+		CreateTween({NotifyFrame, "Size", UDim2.new(0, 320, 0, 90), 0.4, EasingStyle = Enum.EasingStyle.Back, EasingDirection = Enum.EasingDirection.Out})
+
+		-- Progress bar animation
+		local progressTween = CreateTween({ProgressBar, "Size", UDim2.new(0, 0, 1, 0), NDuration, EasingStyle = Enum.EasingStyle.Linear, EasingDirection = Enum.EasingDirection.In})
+		progressTween:Play()
+
+		-- Auto dismiss with exit animation
+		local progressTask = task.spawn(function()
+			task.wait(NDuration)
+			CreateTween({NotifyFrame, "Position", UDim2.new(1, -340, 0, 20), 0.35, EasingStyle = Enum.EasingStyle.Back, EasingDirection = Enum.EasingDirection.In})
+			CreateTween({NotifyFrame, "BackgroundTransparency", 1, 0.35, EasingStyle = Enum.EasingStyle.Quad, EasingDirection = Enum.EasingDirection.In}, true)
+			NotifyFrame:Destroy()
+		end)
 	end
 	function Window:SelectTab(TabSelect)
 		if type(TabSelect) == "number" then
