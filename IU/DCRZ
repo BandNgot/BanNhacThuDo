@@ -3943,48 +3943,180 @@ function redzlib:MakeWindow(Configs)
 	function Window:Notify(Configs)
 		local NTitle = Configs[1] or Configs.Title or "Notification"
 		local NText = Configs[2] or Configs.Text or ""
-		local NDuration = Configs[3] or Configs.Duration or 5
+		local NDuration = Configs[3] or Configs.Duration or 4
 		local NType = Configs[4] or Configs.Type or "Info"
 
+		-- Color schemes for different notification types
 		local colors = {
-			Info = Theme["Color Theme"],
-			Success = Color3.fromRGB(0, 255, 0),
-			Warning = Color3.fromRGB(255, 255, 0),
-			Error = Color3.fromRGB(255, 0, 0)
+			Info = {
+				Primary = Theme["Color Theme"] or Color3.fromRGB(88, 101, 242),
+				Light = Color3.fromRGB(130, 140, 255),
+				Glow = Color3.fromRGB(60, 70, 180)
+			},
+			Success = {
+				Primary = Color3.fromRGB(0, 200, 83),
+				Light = Color3.fromRGB(50, 230, 100),
+				Glow = Color3.fromRGB(0, 150, 60)
+			},
+			Warning = {
+				Primary = Color3.fromRGB(255, 193, 7),
+				Light = Color3.fromRGB(255, 220, 80),
+				Glow = Color3.fromRGB(200, 150, 0)
+			},
+			Error = {
+				Primary = Color3.fromRGB(239, 83, 80),
+				Light = Color3.fromRGB(255, 120, 120),
+				Glow = Color3.fromRGB(180, 50, 50)
+			}
 		}
 
-		local NotifyFrame = Create("Frame", ScreenGui, {
-			Size = UDim2.new(0, 300, 0, 80),
-			Position = UDim2.new(1, -320, 0, 10),
-			BackgroundColor3 = Theme["Color Hub 2"],
-			BackgroundTransparency = 0.1
-		})Make("Corner", NotifyFrame)Make("Stroke", NotifyFrame)
+		local scheme = colors[NType] or colors.Info
 
+		-- Main container with glass effect
+		local NotifyFrame = Create("Frame", ScreenGui, {
+			Size = UDim2.new(0, 320, 0, 90),
+			Position = UDim2.new(1, -340, 0, 20),
+			BackgroundColor3 = Theme["Color Hub 2"] or Color3.fromRGB(35, 35, 40),
+			BackgroundTransparency = 0.3,
+			ClipsDescendants = true
+		})Make("Corner", NotifyFrame, UDim.new(0, 12))
+
+		-- Gradient overlay for depth
+		local Gradient = Create("UIGradient", NotifyFrame, {
+			Color = ColorSequence.new({
+				ColorSequenceKeypoint.new(0, (Theme["Color Hub 1"] and Theme["Color Hub 1"].Keypoints[1].Value) or Color3.fromRGB(45, 45, 50)),
+				ColorSequenceKeypoint.new(1, (Theme["Color Hub 1"] and Theme["Color Hub 1"].Keypoints[2].Value) or Color3.fromRGB(35, 35, 40))
+			}),
+			Rotation = 45,
+			Transparency = NumberSequence.new({
+				NumberSequenceKeypoint.new(0, 0.4),
+				NumberSequenceKeypoint.new(1, 0.5)
+			})
+		})
+
+		-- Left accent bar with glowing effect
+		local AccentBar = Create("Frame", NotifyFrame, {
+			Size = UDim2.new(0, 4, 1, 0),
+			BackgroundColor3 = scheme.Primary,
+			BackgroundTransparency = 0.1
+		})
+
+		-- Glow effect behind accent bar
+		local AccentGlow = Create("Frame", NotifyFrame, {
+			Size = UDim2.new(0, 8, 1, 0),
+			Position = UDim2.new(0, 2, 0, 0),
+			BackgroundColor3 = scheme.Glow,
+			BackgroundTransparency = 0.6,
+			ClipsDescendants = true
+		})Make("Corner", AccentGlow, UDim.new(0, 4))
+
+		-- Icon container
+		local IconContainer = Create("Frame", NotifyFrame, {
+			Size = UDim2.new(0, 44, 0, 44),
+			Position = UDim2.new(0, 20, 0, 23),
+			BackgroundColor3 = scheme.Primary,
+			BackgroundTransparency = 0.9
+		})Make("Corner", IconContainer, UDim.new(0, 10))
+
+		-- Icon based on type
+		local icons = {
+			Info = "rbxassetid://10723415903", -- info icon
+			Success = "rbxassetid://10709790644", -- check icon
+			Warning = "rbxassetid://10709753149", -- alert triangle
+			Error = "rbxassetid://10709753064" -- alert octagon
+		}
+
+		local Icon = Create("ImageLabel", IconContainer, {
+			Size = UDim2.new(0, 24, 0, 24),
+			Position = UDim2.new(0.5, 0, 0.5, 0),
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Image = icons[NType] or icons.Info,
+			ImageColor3 = scheme.Light,
+			BackgroundTransparency = 1
+		})
+
+		-- Title label
 		local TitleLabel = InsertTheme(Create("TextLabel", NotifyFrame, {
-			Size = UDim2.new(1, -10, 0, 20),
-			Position = UDim2.new(0, 5, 0, 5),
+			Size = UDim2.new(1, -85, 0, 22),
+			Position = UDim2.new(0, 75, 0, 20),
 			Text = NTitle,
-			TextColor3 = colors[NType] or Theme["Color Text"],
+			TextColor3 = scheme.Light,
 			Font = Enum.Font.GothamBold,
 			TextSize = 14,
+			TextXAlignment = "Left",
 			BackgroundTransparency = 1
 		}), "Text")
 
+		-- Text label with better wrapping
 		local TextLabel = InsertTheme(Create("TextLabel", NotifyFrame, {
-			Size = UDim2.new(1, -10, 0, 40),
-			Position = UDim2.new(0, 5, 0, 25),
+			Size = UDim2.new(1, -85, 0, 40),
+			Position = UDim2.new(0, 75, 0, 42),
 			Text = NText,
-			TextColor3 = Theme["Color Dark Text"],
+			TextColor3 = Theme["Color Dark Text"] or Color3.fromRGB(180, 180, 180),
 			Font = Enum.Font.Gotham,
 			TextSize = 12,
+			TextXAlignment = "Left",
 			TextWrapped = true,
+			TextYAlignment = "Top",
 			BackgroundTransparency = 1
 		}), "DarkText")
 
-		CreateTween({NotifyFrame, "Position", UDim2.new(1, -10, 0, 10), 0.5})
-		task.wait(NDuration)
-		CreateTween({NotifyFrame, "Position", UDim2.new(1, -320, 0, 10), 0.5, true})
-		NotifyFrame:Destroy()
+		-- Progress bar at bottom
+		local ProgressContainer = Create("Frame", NotifyFrame, {
+			Size = UDim2.new(1, -20, 0, 3),
+			Position = UDim2.new(0.5, 0, 1, -8),
+			AnchorPoint = Vector2.new(0.5, 1),
+			BackgroundColor3 = Color3.fromRGB(60, 60, 60),
+			BackgroundTransparency = 0.5
+		})Make("Corner", ProgressContainer, UDim.new(0, 2))
+
+		local ProgressBar = Create("Frame", ProgressContainer, {
+			Size = UDim2.new(1, 0, 1, 0),
+			BackgroundColor3 = scheme.Primary,
+			BackgroundTransparency = 0.2
+		})Make("Corner", ProgressBar, UDim.new(0, 2))
+
+		-- Subtle close button
+		local CloseBtn = Create("ImageButton", NotifyFrame, {
+			Size = UDim2.new(0, 18, 0, 18),
+			Position = UDim2.new(1, -15, 0, 10),
+			AnchorPoint = Vector2.new(1, 0),
+			Image = "rbxassetid://10747384394",
+			ImageColor3 = Color3.fromRGB(150, 150, 150),
+			BackgroundTransparency = 1,
+			AutoButtonColor = false
+		})
+
+		-- Hover effect for close button
+		CloseBtn.MouseEnter:Connect(function()
+			CreateTween({CloseBtn, "ImageColor3", scheme.Light, 0.2})
+		end)
+		CloseBtn.MouseLeave:Connect(function()
+			CreateTween({CloseBtn, "ImageColor3", Color3.fromRGB(150, 150, 150), 0.2})
+		end)
+		CloseBtn.MouseButton1Click:Connect(function()
+			task.cancel(progressTask)
+			CreateTween({NotifyFrame, "Position", UDim2.new(1, -340, 0, 20), 0.35, true})
+			CreateTween({NotifyFrame, "BackgroundTransparency", 1, 0.35, true})
+			task.wait(0.35)
+			NotifyFrame:Destroy()
+		end)
+
+		-- Entry animation
+		CreateTween({NotifyFrame, "Position", UDim2.new(1, -20, 0, 20), 0.45, EasingStyle = Enum.EasingStyle.Back, EasingDirection = Enum.EasingDirection.Out})
+		CreateTween({NotifyFrame, "Size", UDim2.new(0, 320, 0, 90), 0.4, EasingStyle = Enum.EasingStyle.Back, EasingDirection = Enum.EasingDirection.Out})
+
+		-- Progress bar animation
+		local progressTween = CreateTween({ProgressBar, "Size", UDim2.new(0, 0, 1, 0), NDuration, EasingStyle = Enum.EasingStyle.Linear, EasingDirection = Enum.EasingDirection.In})
+		progressTween:Play()
+
+		-- Auto dismiss with exit animation
+		local progressTask = task.spawn(function()
+			task.wait(NDuration)
+			CreateTween({NotifyFrame, "Position", UDim2.new(1, -340, 0, 20), 0.35, EasingStyle = Enum.EasingStyle.Back, EasingDirection = Enum.EasingDirection.In})
+			CreateTween({NotifyFrame, "BackgroundTransparency", 1, 0.35, EasingStyle = Enum.EasingStyle.Quad, EasingDirection = Enum.EasingDirection.In}, true)
+			NotifyFrame:Destroy()
+		end)
 	end
 	function Window:SelectTab(TabSelect)
 		if type(TabSelect) == "number" then
@@ -4000,12 +4132,103 @@ function redzlib:MakeWindow(Configs)
 	
 	local ContainerList = {}
 	local ContainerOrder = {}
+	local TabOrder = 0
 	local function SetLayoutOrder(Container, Instance)
 		if not Container or not Instance then return end
 		if not Instance:IsA("GuiObject") then return end
 		ContainerOrder[Container] = (ContainerOrder[Container] or 0) + 1
 		Instance.LayoutOrder = ContainerOrder[Container]
 	end
+	function Window:MakeTabGroup(Configs)
+		local GName = Configs[1] or Configs.Title or "Group"
+		local GIcon = Configs[2] or Configs.Icon or ""
+		GIcon = redzlib:GetIcon(GIcon)
+		if not (type(GIcon) == "string" and GIcon:find("rbxassetid://")) then GIcon = false end
+
+		local GroupHolder = Create("Frame", MainScroll, {
+			Size = UDim2.new(1, 0, 0, 24),
+			AutomaticSize = "Y",
+			BackgroundTransparency = 1,
+			Name = ("Group [ %s ]"):format(GName)
+		}, {
+			Create("UIListLayout", {
+				SortOrder = "LayoutOrder",
+				Padding = UDim.new(0, 4)
+			})
+		})
+
+		TabOrder = TabOrder + 1
+		GroupHolder.LayoutOrder = Configs.Order or TabOrder
+
+		local Header = Make("Button", GroupHolder, {
+			Size = UDim2.new(1, 0, 0, 24)
+		})Make("Corner", Header)
+
+		local Arrow = InsertTheme(Create("ImageLabel", Header, {
+			Position = UDim2.new(1, -10, 0.5),
+			Size = UDim2.new(0, 12, 0, 12),
+			AnchorPoint = Vector2.new(1, 0.5),
+			Image = "rbxassetid://10709790948",
+			BackgroundTransparency = 1
+		}), "Text")
+
+		local GLabel = InsertTheme(Create("TextLabel", Header, {
+			Size = UDim2.new(1, GIcon and -52 or -40, 1),
+			Position = UDim2.new(0, GIcon and 22 or 12, 0, 0),
+			BackgroundTransparency = 1,
+			Font = Enum.Font.GothamMedium,
+			Text = GName,
+			TextColor3 = Theme["Color Text"],
+			TextSize = 10,
+			TextXAlignment = Enum.TextXAlignment.Left
+		}), "Text")
+
+		if GIcon then
+			InsertTheme(Create("ImageLabel", Header, {
+				Position = UDim2.new(0, 10, 0.5),
+				Size = UDim2.new(0, 12, 0, 12),
+				AnchorPoint = Vector2.new(0, 0.5),
+				Image = GIcon,
+				BackgroundTransparency = 1
+			}), "Text")
+		end
+
+		local ChildrenHolder = Create("Frame", GroupHolder, {
+			Size = UDim2.new(1, -12, 0, 0),
+			Position = UDim2.new(0, 6, 0, 0),
+			AutomaticSize = "Y",
+			BackgroundTransparency = 1
+		}, {
+			Create("UIListLayout", {
+				SortOrder = "LayoutOrder",
+				Padding = UDim.new(0, 4)
+			}),
+			Create("UIPadding", {
+				PaddingLeft = UDim.new(0, 8),
+				PaddingRight = UDim.new(0, 0),
+				PaddingTop = UDim.new(0, 2)
+			})
+		})
+
+		local expanded = true
+		local function UpdateExpand(state)
+			expanded = state
+			ChildrenHolder.Visible = expanded
+			CreateTween({Arrow, "Rotation", expanded and 90 or 0, 0.15})
+		end
+		UpdateExpand(true)
+		Header.Activated:Connect(function() UpdateExpand(not expanded) end)
+
+		local Group = {}
+		function Group:AddTab(cfg)
+			cfg = cfg or {}
+			cfg.Parent = ChildrenHolder
+			cfg.Group = GName
+			return Window:MakeTab(cfg)
+		end
+		return Group
+	end
+
 	function Window:MakeTab(paste, Configs)
 		if type(paste) == "table" then Configs = paste end
 		local TName = Configs[1] or Configs.Title or "Tab!"
@@ -4016,9 +4239,14 @@ function redzlib:MakeWindow(Configs)
 			TIcon = false
 		end
 		
-		local TabSelect = Make("Button", MainScroll, {
+		local SelectParent = Configs.Parent or MainScroll
+		local TabSelect = Make("Button", SelectParent, {
 			Size = UDim2.new(1, 0, 0, 24)
 		})Make("Corner", TabSelect)
+		if not Configs.Parent then
+			TabOrder = TabOrder + 1
+			TabSelect.LayoutOrder = Configs.Order or TabOrder
+		end
 		
 		local LabelTitle = InsertTheme(Create("TextLabel", TabSelect, {
 			Size = UDim2.new(1, TIcon and -25 or -15, 1),
