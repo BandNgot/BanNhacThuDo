@@ -4132,6 +4132,7 @@ function redzlib:MakeWindow(Configs)
 	
 	local ContainerList = {}
 	local ContainerOrder = {}
+	local TabOrder = 0
 	local function SetLayoutOrder(Container, Instance)
 		if not Container or not Instance then return end
 		if not Instance:IsA("GuiObject") then return end
@@ -4155,6 +4156,9 @@ function redzlib:MakeWindow(Configs)
 				Padding = UDim.new(0, 4)
 			})
 		})
+
+		TabOrder = TabOrder + 1
+		GroupHolder.LayoutOrder = Configs.Order or TabOrder
 
 		local Header = Make("Button", GroupHolder, {
 			Size = UDim2.new(1, 0, 0, 24)
@@ -4239,6 +4243,10 @@ function redzlib:MakeWindow(Configs)
 		local TabSelect = Make("Button", SelectParent, {
 			Size = UDim2.new(1, 0, 0, 24)
 		})Make("Corner", TabSelect)
+		if not Configs.Parent then
+			TabOrder = TabOrder + 1
+			TabSelect.LayoutOrder = Configs.Order or TabOrder
+		end
 		
 		local LabelTitle = InsertTheme(Create("TextLabel", TabSelect, {
 			Size = UDim2.new(1, TIcon and -25 or -15, 1),
