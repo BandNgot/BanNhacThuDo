@@ -3749,13 +3749,14 @@ function redzlib:MakeWindow(Configs)
 	end;LoadFile()
 
 	if redzlib.Save.Scale then
-		redzlib:SetScale(redzlib.Save.Scale)
+		redzlib:SetScale(ViewportSize.Y / redzlib.Save.Scale)
 	end
 
 	local UISizeX, UISizeY = unpack(redzlib.Save.UISize)
 	local MainFrame = InsertTheme(Create("ImageButton", ScreenGui, {
 		Size = UDim2.fromOffset(UISizeX, UISizeY),
-		Position = UDim2.new(0.5, -UISizeX/2, 0.5, -UISizeY/2),
+		Position = UDim2.new(0.5, 0, 0.5, 0),
+		AnchorPoint = Vector2.new(0.5, 0.5),
 		BackgroundTransparency = 0.03,
 		Name = "Hub"
 	}), "Main")
@@ -4083,13 +4084,47 @@ function redzlib:MakeWindow(Configs)
 	
 	local Minimized, SaveSize, WaitClick
 	local Window, FirstTab = {}, false
+
+	local function PlayWindowAnim(Open, Slide)
+		local US = MainFrame:FindFirstChildOfClass("UIScale") or Create("UIScale", MainFrame, {Scale = 1})
+		local Center = UDim2.new(0.5, 0, 0.5, 0)
+		local Up = UDim2.new(0.5, 0, 0.5, -24)
+		local function Tween(Inst, Prop, Val, Time, Style, Dir)
+			TweenService:Create(Inst, TweenInfo.new(Time, Style, Dir), {[Prop] = Val}):Play()
+		end
+		if Open then
+			US.Scale = 0.96
+			if Slide then MainFrame.Position = Up end
+			MainFrame.BackgroundTransparency = 1
+			if Theme.Image then MainFrame.ImageTransparency = 1 end
+			Tween(US, "Scale", 1, 0.4, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+			if Slide then Tween(MainFrame, "Position", Center, 0.4, Enum.EasingStyle.Quart, Enum.EasingDirection.Out) end
+			Tween(MainFrame, "BackgroundTransparency", Theme.Image and 1 or 0.03, 0.34, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
+			if Theme.Image then Tween(MainFrame, "ImageTransparency", 0, 0.34, Enum.EasingStyle.Sine, Enum.EasingDirection.Out) end
+		else
+			Tween(US, "Scale", 0.96, 0.28, Enum.EasingStyle.Quart, Enum.EasingDirection.In)
+			if Slide then Tween(MainFrame, "Position", Up, 0.28, Enum.EasingStyle.Quart, Enum.EasingDirection.In) end
+			Tween(MainFrame, "BackgroundTransparency", 1, 0.28, Enum.EasingStyle.Sine, Enum.EasingDirection.In)
+			if Theme.Image then Tween(MainFrame, "ImageTransparency", 1, 0.28, Enum.EasingStyle.Sine, Enum.EasingDirection.In) end
+		end
+	end
+
+	local function CloseWindow()
+		PlayWindowAnim(false, true)
+		task.delay(0.3, function()
+			if ScreenGui and ScreenGui.Parent then
+				ScreenGui:Destroy()
+			end
+		end)
+	end
+
 	function Window:CloseBtn()
 		local Dialog = Window:Dialog({
 			Title = "Close",
 			Text = "You Want Close Ui?",
 			Options = {
 				{"Confirm", function()
-					ScreenGui:Destroy()
+					CloseWindow()
 				end},
 				{"Cancel"}
 			}
@@ -4117,30 +4152,62 @@ function redzlib:MakeWindow(Configs)
 		WaitClick = false
 	end
 	function Window:Minimize()
-		MainFrame.Visible = not MainFrame.Visible
+		local Show = not MainFrame.Visible
+		if Show then MainFrame.Visible = true end
+		PlayWindowAnim(Show, false)
+		if not Show then
+			task.delay(0.3, function()
+				if not MainFrame.Visible then return end
+				MainFrame.Visible = false
+			end)
+		end
 	end
 	function Window:AddMinimizeButton(Configs)
+		Configs = Configs or {}
 		local Button = MakeDrag(Create("ImageButton", ScreenGui, {
-			Size = UDim2.fromOffset(35, 35),
-			Position = UDim2.fromScale(0.15, 0.15),
-			BackgroundTransparency = 1,
+			Size = UDim2.fromOffset(38, 38),
+			Position = Configs.Position or UDim2.fromScale(0.15, 0.15),
+			BackgroundTransparency = Configs.BackgroundTransparency or 0.12,
 			BackgroundColor3 = Theme["Color Hub 2"],
 			AutoButtonColor = false
 		}))
-		
-		local Stroke, Corner
+
+		local Corner, Stroke
 		if Configs.Corner then
 			Corner = Make("Corner", Button)
 			SetProps(Corner, Configs.Corner)
+		else
+			Corner = Make("Corner", Button, UDim.new(0, 9))
 		end
 		if Configs.Stroke then
 			Stroke = Make("Stroke", Button)
-			SetProps(Stroke, Configs.Corner)
+			SetProps(Stroke, Configs.Stroke)
+		else
+			Stroke = Make("Stroke", Button, {Transparency = 0.35})
 		end
-		
+		if Configs.Image then
+			Button.Image = Configs.Image
+		end
+		if Configs.BackgroundTransparency ~= nil then
+			Button.BackgroundTransparency = Configs.BackgroundTransparency
+		end
 		SetProps(Button, Configs.Button)
-		Button.Activated:Connect(Window.Minimize)
-		
+
+		local Hover = Create("UIScale", Button, {Scale = 1})
+		Button.MouseEnter:Connect(function()
+			CreateTween({Hover, "Scale", 1.12, 0.18})
+			if Stroke then CreateTween({Stroke, "Transparency", 0.1, 0.18}) end
+		end)
+		Button.MouseLeave:Connect(function()
+			CreateTween({Hover, "Scale", 1, 0.18})
+			if Stroke then CreateTween({Stroke, "Transparency", 0.35, 0.18}) end
+		end)
+		Button.Activated:Connect(function()
+			Hover.Scale = 0.82
+			CreateTween({Hover, "Scale", 1, 0.25})
+			Window.Minimize()
+		end)
+
 		return {
 			Stroke = Stroke,
 			Corner = Corner,
@@ -4215,15 +4282,14 @@ function redzlib:MakeWindow(Configs)
 			Active = true,
 			BackgroundColor3 = Theme["Color Hub 2"],
 			Size = UDim2.new(1, 0, 1, 0),
-			BackgroundColor3 = Theme["Color Stroke"],
 			Name = "Dialog"
 		}), "Stroke")
-		
+
 		MainCorner:Clone().Parent = Screen
 		Frame.Parent = Screen
 		CreateTween({Frame, "Size", UDim2.fromOffset(250, 150), 0.2})
-		CreateTween({Frame, "Transparency", 0, 0.15})
-		CreateTween({Screen, "Transparency", 0.3, 0.15})
+		CreateTween({Frame, "BackgroundTransparency", 0, 0.15})
+		CreateTween({Screen, "BackgroundTransparency", 0.3, 0.15})
 		
 		local ButtonCount, Dialog = 1, {}
 		function Dialog:Button(Configs)
@@ -4250,8 +4316,8 @@ function redzlib:MakeWindow(Configs)
 		end
 		function Dialog:Close()
 			CreateTween({Frame, "Size", UDim2.fromOffset(250 * 1.08, 150 * 1.08), 0.2})
-			CreateTween({Screen, "Transparency", 1, 0.15})
-			CreateTween({Frame, "Transparency", 1, 0.15, true})
+			CreateTween({Screen, "BackgroundTransparency", 1, 0.15})
+			CreateTween({Frame, "BackgroundTransparency", 1, 0.15, true})
 			Screen:Destroy()
 		end
 		table.foreach(DOptions, function(_,Button)
@@ -5205,6 +5271,14 @@ function redzlib:MakeWindow(Configs)
 			end
 			return Section
 		end
+		function Tab:AddFrame(Instance)
+			if Instance and Instance:IsA("Instance") then
+				Instance.Parent = Container
+				SetLayoutOrder(Container, Instance)
+			end
+			return Instance
+		end
+
 		function Tab:AddParagraph(Configs)
 			local PName = Configs[1] or Configs.Title or "Paragraph"
 			local PDesc = Configs[2] or Configs.Text or ""
@@ -5650,7 +5724,6 @@ function redzlib:MakeWindow(Configs)
 				end
 				ScrollSize = (math.clamp(Count, 0, 10) * 25) + 36
 				if NoClickFrame.Visible then
-					NoClickFrame.Visible = true
 					CreateTween({DropFrame, "Size", GetFrameSize(), 0.2, true})
 				end
 			end
@@ -5897,9 +5970,21 @@ function redzlib:MakeWindow(Configs)
 				end
 			end
 			function Dropdown:Remove(Option)
-				for index, Value in pairs(GetOptions()) do
-					if (type(Option) == "number" and index == Option) or (type(Option) == "string" and Value.Name == Option) then
-						RemoveOption(index, Value.Value)
+				if type(Option) == "number" then
+					local list = {}
+					for _, Value in pairs(GetOptions()) do
+						table.insert(list, Value)
+					end
+					local Value = list[Option]
+					if Value then
+						RemoveOption(Value.Name, Value.Value)
+					end
+				elseif type(Option) == "string" then
+					for _, Value in pairs(GetOptions()) do
+						if Value.Name == Option then
+							RemoveOption(Value.Name, Value.Value)
+							break
+						end
 					end
 				end
 			end
@@ -5907,8 +5992,10 @@ function redzlib:MakeWindow(Configs)
 				if type(Option) == "string" then
 					SelectByName(Option)
 				elseif type(Option) == "number" then
-					for ind,Val in pairs(Options) do
-						if ind == Option then
+					local i = 0
+					for _, Val in pairs(Options) do
+						i = i + 1
+						if i == Option then
 							SelectByName(Val.Name)
 							break
 						end
@@ -6416,6 +6503,8 @@ function redzlib:MakeWindow(Configs)
 	print("Applying saved theme: " .. redzlib.Save.Theme)
 	redzlib:SetTheme(redzlib.Save.Theme, true)
 	redzlib:SetSignaturePreset(redzlib.Save.SignaturePreset or "DacCau Classic", true)
+
+	PlayWindowAnim(true, true)
 
 	return Window
 end
