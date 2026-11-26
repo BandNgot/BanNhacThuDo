@@ -1,0 +1,2416 @@
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+local CoreGui = game:GetService("CoreGui")
+local SoundService = game:GetService("SoundService")
+local GuiService = game:GetService("GuiService")
+local Lighting = game:GetService("Lighting")
+
+local function getGlobalEnv()
+    local ok, env = pcall(function() return type(getgenv) == "function" and getgenv() or _G end)
+    return (ok and type(env) == "table") and env or _G
+end
+
+local function cleanupOrphanedEffects()
+    pcall(function()
+        for _, child in ipairs(Lighting:GetChildren()) do
+            if (child:IsA("DepthOfFieldEffect") and child.Name:sub(1, 17) == "DacCauAcrylicDOF_")
+                or (child:IsA("BlurEffect") and child.Name:sub(1, 22) == "DacCauLiquidGlassBlur_") then
+                child:Destroy()
+            end
+        end
+    end)
+    pcall(function()
+        local cam = workspace.CurrentCamera
+        if cam then
+            for _, child in ipairs(cam:GetChildren()) do
+                if child.Name == "DacCauAcrylicWedge" then child:Destroy() end
+            end
+        end
+    end)
+end
+
+local FeedbackWidget = {}
+FeedbackWidget.__index = FeedbackWidget
+FeedbackWidget._activeInstance = nil
+
+local FONT_BODY = Enum.Font.Gotham
+local FONT_MEDIUM = Enum.Font.GothamMedium
+local FONT_BOLD = Enum.Font.GothamBold
+local FONT_MONO = Enum.Font.RobotoMono
+
+local TAB_ORDER = {"de_xuat_game", "bao_loi_script", "khac"}
+local TAB_CONFIG = {
+    de_xuat_game = {
+        label = "Gop y Cho Script",
+        short = "Game",
+        hintTitle = "Vi du: Them game, script game bloxfruits",
+        hintBody = "Neu ten game/script, game/map va ly do nen them..."
+    },
+    bao_loi_script = {
+        label = "Bao loi",
+        short = "Loi",
+        hintTitle = "Vi du: Script nao chay khong len?",
+        hintBody = "Ghi ro buoc tai hien, map, level va loi gap phai..."
+    },
+    khac = {
+        label = "Khac",
+        short = "Khac",
+        hintTitle = "Tieu de ngan gon",
+        hintBody = "Nhap noi dung phan hoi..."
+    }
+}
+
+FeedbackWidget.TAB_ORDER = TAB_ORDER
+FeedbackWidget.TAB_CONFIG = TAB_CONFIG
+
+local DEFAULT_PLAYLIST = {
+    {title = "See Tình", artist = "Hoàng Thùy Linh", soundId = "rbxassetid://121242950842428"},
+    {title = "Hai Phút Hơn x Mi Mi Mi", artist = "Pháo Remix", soundId = "rbxassetid://124166975687737"},
+    {title = "Cứ Thế Mong Chờ", artist = "Remix", soundId = "rbxassetid://73423580532746"},
+    {title = "Ai Đưa Em Về", artist = "Remix", soundId = "rbxassetid://110919391228823"},
+    {title = "Cùng Anh", artist = "Remix", soundId = "rbxassetid://71716020610625"},
+    {title = "Phía Sau Một Cô Gái", artist = "Remix", soundId = "rbxassetid://109743636792463"},
+    {title = "Sóng Gió", artist = "Jack x K-ICM Remix", soundId = "rbxassetid://90113853563664"},
+    {title = "Phố Cũ Còn Anh", artist = "Remix", soundId = "rbxassetid://107810773290624"},
+    {title = "Ngày Em Đẹp Nhất", artist = "Remix", soundId = "rbxassetid://88813570339536"},
+    {title = "Chạy Về Với Anh", artist = "Remix", soundId = "rbxassetid://127667093795280"},
+    {title = "Anh Cứ Đi Đi", artist = "Remix", soundId = "rbxassetid://103475172398501"},
+    {title = "Trả Lại Cho Anh", artist = "Remix", soundId = "rbxassetid://110396752508363"},
+    {title = "Katy Katy", artist = "Remix", soundId = "rbxassetid://95300067259927"},
+    {title = "Chỉ Còn Là Giấc Mơ", artist = "Remix", soundId = "rbxassetid://121051113937228"},
+    {title = "Trái Đất Yêu Mặt Trời x Nắng Có Mang Em Đi", artist = "Remix", soundId = "rbxassetid://140553267266985"},
+    {title = "Cố Giang Tình", artist = "DJ Remix", soundId = "rbxassetid://103038059531764"},
+    {title = "Mất Anh Rồi", artist = "Remix", soundId = "rbxassetid://118574601343022"},
+    {title = "Khuê Mộc Lan", artist = "Remix", soundId = "rbxassetid://98361989582185"},
+    {title = "Tuyển Vợ", artist = "Remix", soundId = "rbxassetid://139968910103444"},
+    {title = "Chuyện Nàng Trinh Nữ Tên Thi", artist = "Remix", soundId = "rbxassetid://119526323504077"},
+    {title = "Hối Hận Trong Anh", artist = "DJ", soundId = "rbxassetid://80415307715259"},
+    {title = "Lạc Chốn Hồng Trần", artist = "Remix", soundId = "rbxassetid://116260601379194"},
+    {title = "Tiến Quân Ca", artist = "Quốc ca Việt Nam", soundId = "rbxassetid://1845922899"},
+    {title = "2 Phút Hơn (KAIZ Remix)", artist = "KAIZ Remix", soundId = "rbxassetid://78534559289195"},
+    {title = "Thế Gian Xoay Vòng", artist = "Không Thời Gian Remix", soundId = "rbxassetid://113675312413032"},
+    {title = "Vạn Vật Thay Đổi Vật Chất Lên Ngôi", artist = "Remix", soundId = "rbxassetid://108477308631109"},
+    {title = "Remix Anh Là Cmn Địch", artist = "Remix", soundId = "rbxassetid://110404768256690"},
+    {title = "Remix Chữ Nghĩa Chữ Tiền", artist = "Remix", soundId = "rbxassetid://100551543792666"}
+}
+
+local MUSIC_TABS = {{key = "playlist", label = "Playlist"}, {key = "favorites", label = "Saved"}, {key = "search", label = "Search"}}
+
+-- Theme & Utilities ----------------------------------------------------------
+
+local function buildTheme(config)
+    local isLight = tostring(config.glassStyle or "dark"):lower() == "light"
+    local accent = config.accentColor or Color3.fromRGB(64, 156, 255)
+    local h, s, v = accent:ToHSV()
+    local white = Color3.fromRGB(255, 255, 255)
+    return {
+        glassStyle = isLight and "light" or "dark",
+        accent = accent,
+        accentDim = Color3.fromHSV(h, math.clamp(s * 0.90, 0, 1), math.clamp(v * 0.80, 0, 1)),
+        ok = Color3.fromRGB(48, 209, 88), err = Color3.fromRGB(255, 69, 58),
+        heart = Color3.fromRGB(255, 55, 95), shadow = Color3.fromRGB(0, 0, 0), rim = white,
+        panelTop = isLight and Color3.fromRGB(244, 248, 255) or Color3.fromRGB(20, 26, 40),
+        panelTransparency = isLight and 0.52 or 0.58,
+        cardBg = white,
+        cardTransparency = isLight and 0.68 or 0.86,
+        cardHover = isLight and Color3.fromRGB(242, 247, 255) or white,
+        cardHoverTransparency = isLight and 0.52 or 0.76,
+        inputBg = white,
+        inputTransparency = isLight and 0.66 or 0.84,
+        pillBg = white,
+        pillTransparency = isLight and 0.60 or 0.82,
+        segmentBg = isLight and Color3.fromRGB(214, 226, 244) or white,
+        segmentTransparency = isLight and 0.64 or 0.84,
+        segmentIndicator = white,
+        segmentIndicatorTransp = isLight and 0.22 or 0.72,
+        text = isLight and Color3.fromRGB(18, 23, 36) or Color3.fromRGB(255, 255, 255),
+        textDim = isLight and Color3.fromRGB(68, 80, 108) or Color3.fromRGB(228, 236, 252),
+        textMuted = isLight and Color3.fromRGB(115, 128, 156) or Color3.fromRGB(196, 208, 232),
+        textStrokeTransp = isLight and 0.96 or 0.76,
+        islandBg = isLight and Color3.fromRGB(236, 242, 252) or Color3.fromRGB(14, 17, 26),
+        islandTransparency = isLight and 0.26 or 0.22,
+        islandText = isLight and Color3.fromRGB(18, 23, 36) or Color3.fromRGB(246, 249, 255),
+        islandDim = isLight and Color3.fromRGB(78, 90, 116) or Color3.fromRGB(174, 186, 214)
+    }
+end
+
+local function create(className, props, parent)
+    local obj = Instance.new(className)
+    if props then for k, v in pairs(props) do obj[k] = v end end
+    if parent then obj.Parent = parent end
+    return obj
+end
+
+local function addCorner(p, r)
+    return create("UICorner", {CornerRadius = typeof(r) == "UDim" and r or UDim.new(0, r or 18)}, p)
+end
+
+local function addStroke(p, c, t, th)
+    return create("UIStroke", {ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Thickness = th or 1, Color = c, Transparency = t or 0.78}, p)
+end
+
+local function addPadding(p, t, r, b, l)
+    return create("UIPadding", {PaddingTop = UDim.new(0, t or 0), PaddingRight = UDim.new(0, r or t or 0), PaddingBottom = UDim.new(0, b or t or 0), PaddingLeft = UDim.new(0, l or r or t or 0)}, p)
+end
+
+local function addSpecularRim(obj, thickness, topT, midT, botT)
+    local st = addStroke(obj, Color3.fromRGB(255, 255, 255), 0, thickness or 1.1)
+    create("UIGradient", {
+        Rotation = 45,
+        Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, topT or 0.14),
+            NumberSequenceKeypoint.new(0.45, midT or 0.80),
+            NumberSequenceKeypoint.new(1, botT or 0.28)
+        })
+    }, st)
+    return st
+end
+
+local function makeLabel(p, txt, font, sz, col, pos, size, z, alignX)
+    return create("TextLabel", {
+        BackgroundTransparency = 1, Position = pos or UDim2.new(), Size = size or UDim2.fromScale(1, 1),
+        Font = font or FONT_BODY, TextSize = sz or 12, TextColor3 = col,
+        TextStrokeColor3 = Color3.fromRGB(0, 0, 0), TextStrokeTransparency = 0.90,
+        TextXAlignment = alignX or Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd, Text = txt or "", ZIndex = z or 15
+    }, p)
+end
+
+local function makePillBtn(p, bg, transp, anchor, pos, size, z, strokeCol, strokeTransp)
+    local b = create("TextButton", {
+        BackgroundColor3 = bg, BackgroundTransparency = transp, AnchorPoint = anchor or Vector2.new(),
+        Position = pos, Size = size, Text = "", AutoButtonColor = false, ZIndex = z or 16
+    }, p)
+    addCorner(b, UDim.new(1, 0))
+    if strokeCol then addStroke(b, strokeCol, strokeTransp or 0.72, 1) end
+    return b
+end
+
+local function trimString(v) return tostring(v or ""):gsub("^%s+", ""):gsub("%s+$", "") end
+
+local function shortenText(value, maxChars)
+    local text, limit = tostring(value or ""), math.max(1, tonumber(maxChars) or 32)
+    local ok, len = pcall(utf8.len, text)
+    if ok and len then
+        if len <= limit then return text end
+        local cut = utf8.offset(text, limit <= 3 and (limit + 1) or (limit - 2))
+        if cut then return text:sub(1, cut - 1) .. (limit <= 3 and "" or "...") end
+    end
+    return (#text <= limit) and text or (text:sub(1, math.max(1, limit - 3)) .. "...")
+end
+
+local function extractAssetId(v)
+    local t = trimString(v)
+    return t ~= "" and (t:match("rbxassetid://(%d+)") or t:match("(%d+)")) or nil
+end
+
+local function normalizeSoundId(v)
+    local id = extractAssetId(v)
+    return id and ("rbxassetid://" .. id) or nil
+end
+
+local function urlEncode(v)
+    return tostring(v or ""):gsub("([^%w%-_%.~])", function(c) return string.format("%%%02X", string.byte(c)) end)
+end
+
+local function formatTime(s)
+    local total = math.max(0, math.floor(tonumber(s) or 0))
+    return string.format("%d:%02d", math.floor(total / 60), total % 60)
+end
+
+local function toIsoTimestamp()
+    local ok, dt = pcall(function() return DateTime.now():ToIsoDate() end)
+    return (ok and dt) or os.date("!%Y-%m-%dT%H:%M:%SZ")
+end
+
+local function getUiParent(customParent)
+    if customParent then return customParent end
+    local okH, hiddenUi = pcall(function() return type(gethui) == "function" and gethui() or nil end)
+    if okH and hiddenUi then return hiddenUi end
+    if pcall(function() return CoreGui.Name end) then return CoreGui end
+    local plr = Players.LocalPlayer
+    return (plr and plr:FindFirstChildOfClass("PlayerGui")) or CoreGui
+end
+
+local function getRequestFn()
+    if syn and type(syn.request) == "function" then return syn.request end
+    if http and type(http.request) == "function" then return http.request end
+    if fluxus and type(fluxus.request) == "function" then return fluxus.request end
+    if type(http_request) == "function" then return http_request end
+    if type(request) == "function" then return request end
+    return nil
+end
+
+local function copyToClipboard(text)
+    for _, fn in ipairs({setclipboard, toclipboard, set_clipboard}) do
+        if type(fn) == "function" and pcall(fn, tostring(text or "")) then return true end
+    end
+    return false
+end
+
+local function readJsonFile(path)
+    if type(readfile) ~= "function" then return nil, "readfile missing" end
+    if type(isfile) == "function" then
+        local ok, exists = pcall(isfile, path)
+        if ok and not exists then return nil, "file missing" end
+    end
+    local ok, content = pcall(readfile, path)
+    if not ok or type(content) ~= "string" or content == "" then return nil, tostring(content or "empty file") end
+    local decOk, decoded = pcall(function() return HttpService:JSONDecode(content) end)
+    if not decOk or type(decoded) ~= "table" then return nil, "json decode failed" end
+    return decoded, nil
+end
+
+local function writeJsonFile(path, data)
+    if type(writefile) ~= "function" then return false, "writefile missing" end
+    local encOk, encoded = pcall(function() return HttpService:JSONEncode(data) end)
+    if not encOk then return false, tostring(encoded) end
+    local wOk, err = pcall(writefile, path, encoded)
+    return wOk, wOk and nil or tostring(err)
+end
+
+local function getExecutorName()
+    for _, fn in ipairs({identifyexecutor, getexecutorname, get_executor_name}) do
+        if type(fn) == "function" then
+            local ok, v = pcall(fn)
+            if ok and v then return tostring(v) end
+        end
+    end
+    return "unknown"
+end
+
+-- Discord Webhook Client -----------------------------------------------------
+
+local WebhookClient = {}
+WebhookClient.__index = WebhookClient
+function WebhookClient.new(url) return setmetatable({url = url}, WebhookClient) end
+
+function WebhookClient:send(payload)
+    if type(self.url) ~= "string" or not self.url:match("^https?://") then
+        return {ok = false, statusCode = 0, error = "Invalid webhook URL"}
+    end
+    local req = getRequestFn()
+    if not req then
+        return {ok = false, statusCode = 0, error = "No supported request function (syn.request/http.request/request)"}
+    end
+    local encOk, body = pcall(function() return HttpService:JSONEncode(payload) end)
+    if not encOk then return {ok = false, statusCode = 0, error = "JSON encode failed: " .. tostring(body)} end
+
+    local ok, response = pcall(req, {Url = self.url, Method = "POST", Headers = {["Content-Type"] = "application/json"}, Body = body})
+    if not ok then return {ok = false, statusCode = 0, error = tostring(response)} end
+    if type(response) ~= "table" then return {ok = false, statusCode = 0, error = "Invalid HTTP response"} end
+
+    local status = tonumber(response.StatusCode or response.Status or response.statusCode or response.status or 0) or 0
+    local success = response.Success
+    if success == nil then success = response.success end
+    if success == nil then success = (status >= 200 and status < 300) end
+    local respBody, statusMsg = response.Body ~= nil and response.Body or response.body, response.StatusMessage or response.statusMessage
+    local errMsg
+    if success ~= true then
+        if type(respBody) == "string" and trimString(respBody) ~= "" then errMsg = shortenText(trimString(respBody), 140)
+        elseif type(statusMsg) == "string" and trimString(statusMsg) ~= "" then errMsg = statusMsg
+        else errMsg = status > 0 and ("HTTP " .. tostring(status)) or "Request failed" end
+    end
+    return {ok = success == true, statusCode = status, error = errMsg}
+end
+
+-- Liquid Glass & Pure-UI Geometric Icons -------------------------------------
+
+local ISLAND_BG_SEQ = NumberSequence.new({
+    NumberSequenceKeypoint.new(0, 0.04),
+    NumberSequenceKeypoint.new(0.5, 0.18),
+    NumberSequenceKeypoint.new(1, 0.08)
+})
+
+local SHEET_BG_SEQ = NumberSequence.new({
+    NumberSequenceKeypoint.new(0, 0.72),
+    NumberSequenceKeypoint.new(0.5, 0.86),
+    NumberSequenceKeypoint.new(1, 0.76)
+})
+
+local function buildOuterShadow(parent, zIndex, isExpanded)
+    local holder = create("Frame", {BackgroundTransparency = 1, BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 0), ZIndex = zIndex or 1}, parent)
+    local pad, offsetY, transp = isExpanded and 34 or 22, isExpanded and 5 or 3, isExpanded and 0.78 or 0.84
+    local img = create("ImageLabel", {
+        Name = "DropShadow", BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.new(0.5, 0, 0.5, offsetY), Size = UDim2.new(1, pad, 1, pad),
+        Image = "rbxassetid://5028857084", ScaleType = Enum.ScaleType.Slice, SliceCenter = Rect.new(24, 24, 276, 276),
+        ImageColor3 = Color3.fromRGB(0, 0, 0), ImageTransparency = transp, ZIndex = zIndex or 1
+    }, holder)
+    return holder, img
+end
+
+local function shrinkCornerRadius(radius, delta)
+    if typeof(radius) == "UDim" then
+        return UDim.new(radius.Scale, math.max(0, radius.Offset - delta))
+    end
+    return UDim.new(0, math.max(0, (tonumber(radius) or 18) - delta))
+end
+
+local function applyLiquidGlass(widget, frame, opts)
+    opts = opts or {}
+    local theme, radius, isIsland = widget.theme, opts.radius or widget.config.glassCornerRadius, opts.isIsland == true
+    frame.BackgroundColor3 = opts.bgColor or (isIsland and theme.islandBg or theme.panelTop)
+    frame.BackgroundTransparency = opts.transparency or (isIsland and theme.islandTransparency or theme.panelTransparency)
+    frame.BorderSizePixel = 0
+    local mainCorner = addCorner(frame, radius)
+    widget._glass = widget._glass or {}
+
+    if not widget.config.liquidGlass then
+        local glass = {mainCorner = mainCorner, outerStroke = addStroke(frame, theme.rim, 0.72, 1)}
+        widget._glass[frame] = glass
+        return glass
+    end
+
+    local panelGrad = create("UIGradient", {
+        Rotation = 135,
+        Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)), ColorSequenceKeypoint.new(1, Color3.fromRGB(216, 228, 248))}),
+        Transparency = isIsland and ISLAND_BG_SEQ or SHEET_BG_SEQ
+    }, frame)
+
+    local outerStroke = addStroke(frame, theme.rim, 0.55, isIsland and 1.25 or 1.0)
+    local rimGrad = create("UIGradient", {
+        Rotation = 45,
+        Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0.30),
+            NumberSequenceKeypoint.new(0.35, 0.90),
+            NumberSequenceKeypoint.new(0.55, 0.50),
+            NumberSequenceKeypoint.new(0.78, 0.90),
+            NumberSequenceKeypoint.new(1, 0.30)
+        })
+    }, outerStroke)
+
+    local bevelRadius = shrinkCornerRadius(radius, 1)
+    local bevel = create("Frame", {BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.new(1, -2, 1, -2), ZIndex = (frame.ZIndex or 1) + 3}, frame)
+    local bevelCorner = addCorner(bevel, bevelRadius)
+    create("UIGradient", {
+        Rotation = 90,
+        Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0.76),
+            NumberSequenceKeypoint.new(0.5, 0.97),
+            NumberSequenceKeypoint.new(1, 0.90)
+        })
+    }, addStroke(bevel, theme.rim, 0, 1))
+
+    table.insert(widget._reactiveSheens, {host = frame, rimGrad = rimGrad})
+    local glass = {mainCorner = mainCorner, bevelCorner = bevelCorner, outerStroke = outerStroke, panelGrad = panelGrad, rimGrad = rimGrad, lensCorners = {}}
+    widget._glass[frame] = glass
+    return glass
+end
+
+local function makePillBar(p, col, pos, sz, rot, z)
+    local bar = create("Frame", {BackgroundColor3 = col, BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 0.5), Position = pos, Size = sz, Rotation = rot or 0, ZIndex = z}, p)
+    addCorner(bar, UDim.new(1, 0))
+    return bar
+end
+
+local function makeTriangleShape(p, col, dir, h, z)
+    local clip = create("Frame", {BackgroundTransparency = 1, ClipsDescendants = true, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(math.max(5, math.floor(h * 0.55)), h), ZIndex = z}, p)
+    local sq = math.ceil(h * 0.72)
+    create("Frame", {BackgroundColor3 = col, BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(dir == "left" and 1 or 0, 0, 0.5, 0), Size = UDim2.fromOffset(sq, sq), Rotation = 45, ZIndex = z}, clip)
+end
+
+local function makeCloseIcon(p, col, z)
+    local box = create("Frame", {BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(12, 12), ZIndex = z}, p)
+    makePillBar(box, col, UDim2.fromScale(0.5, 0.5), UDim2.fromOffset(13, 2), 45, z)
+    makePillBar(box, col, UDim2.fromScale(0.5, 0.5), UDim2.fromOffset(13, 2), -45, z)
+end
+
+local function makeChevronDownIcon(p, col, z)
+    local box = create("Frame", {BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(12, 10), ZIndex = z}, p)
+    makePillBar(box, col, UDim2.new(0.5, -2, 0.5, 0), UDim2.fromOffset(7, 2), 38, z)
+    makePillBar(box, col, UDim2.new(0.5, 2, 0.5, 0), UDim2.fromOffset(7, 2), -38, z)
+end
+
+local function makeSkipIcon(p, col, dir, z)
+    local box = create("Frame", {BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(14, 14), ZIndex = z}, p)
+    local tri = create("Frame", {BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, dir == "left" and 2 or -2, 0.5, 0), Size = UDim2.fromOffset(8, 12), ZIndex = z}, box)
+    makeTriangleShape(tri, col, dir, 11, z)
+    makePillBar(box, col, UDim2.new(0.5, dir == "left" and -4 or 4, 0.5, 0), UDim2.fromOffset(2, 11), 0, z)
+end
+
+local function makePlayPauseIcon(p, col, z)
+    local playH = create("Frame", {BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 1, 0.5, 0), Size = UDim2.fromOffset(10, 14), ZIndex = z}, p)
+    makeTriangleShape(playH, col, "right", 13, z)
+    local pauseH = create("Frame", {BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(11, 13), Visible = false, ZIndex = z}, p)
+    makePillBar(pauseH, col, UDim2.new(0.5, -3, 0.5, 0), UDim2.fromOffset(3, 12), 0, z)
+    makePillBar(pauseH, col, UDim2.new(0.5, 3, 0.5, 0), UDim2.fromOffset(3, 12), 0, z)
+    return {setPlaying = function(pl) playH.Visible = not pl; pauseH.Visible = pl == true end}
+end
+
+local function makeSpeakerIcon(p, col, z)
+    local box = create("Frame", {BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(14, 14), ZIndex = z}, p)
+    makePillBar(box, col, UDim2.new(0, 4, 0.5, 0), UDim2.fromOffset(4, 6), 0, z)
+    local cone = create("Frame", {BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0, 6, 0.5, 0), Size = UDim2.fromOffset(6, 10), ZIndex = z}, box)
+    makeTriangleShape(cone, col, "left", 10, z)
+    local wave = makePillBar(box, col, UDim2.new(0, 11, 0.5, 0), UDim2.fromOffset(2, 7), 0, z)
+    local slash = makePillBar(box, Color3.fromRGB(255, 84, 84), UDim2.fromScale(0.5, 0.5), UDim2.fromOffset(14, 2), -42, z + 1)
+    slash.Visible = false
+    return {setMuted = function(m) wave.Visible = not m; slash.Visible = m == true end}
+end
+
+-- Constructor & Lifecycle ----------------------------------------------------
+
+function FeedbackWidget.new(config)
+    config = config or {}
+    local self = setmetatable({}, FeedbackWidget)
+    local defaultPlaylist = {}
+    for _, item in ipairs(DEFAULT_PLAYLIST) do
+        table.insert(defaultPlaylist, {title = item.title, artist = item.artist, soundId = item.soundId})
+    end
+
+    self.config = {
+        guiName = config.guiName or "DacCauFeedbackWidget",
+        title = config.title or "Feedback",
+        subtitle = config.subtitle or "Gui gop y nhanh cho Dac Cau Hub",
+        webhookUrl = config.webhookUrl or "",
+        scriptVersion = config.scriptVersion or "unknown",
+        rightMargin = config.rightMargin or 20,
+        midYScale = config.midYScale or 0.5,
+        collapsedWidth = config.collapsedWidth or config.islandWidth or config.buttonWidth or 172,
+        collapsedHeight = config.collapsedHeight or config.islandHeight or config.buttonHeight or 40,
+        panelWidth = config.panelWidth or config.expandedWidth or 376,
+        panelHeight = config.panelHeight or config.expandedHeight or 476,
+        liquidGlass = config.liquidGlass ~= false,
+        glassStyle = tostring(config.glassStyle or "dark"):lower() == "light" and "light" or "dark",
+        glassBlur = config.glassBlur ~= nil and config.glassBlur or 10,
+        useWorldBlur = config.useWorldBlur == true,
+        backdropLens = config.backdropLens ~= false,
+        lensMagnification = math.clamp(tonumber(config.lensMagnification) or 1.24, 1.05, 1.8),
+        lensEdgeMagnification = math.clamp(tonumber(config.lensEdgeMagnification) or 1.42, 1.08, 2.0),
+        backdropGui = config.backdropGui,
+        glassCornerRadius = config.glassCornerRadius or UDim.new(0, 28),
+        respectTopInset = config.respectTopInset ~= false,
+        topOffset = config.topOffset or 10,
+        expandedTopOffset = config.expandedTopOffset or config.topOffset or 12,
+        hiddenTopOffset = config.hiddenTopOffset,
+        autoHideDelay = config.autoHideDelay or 10,
+        revealHoverWidth = config.revealHoverWidth or 340,
+        revealHoverHeight = config.revealHoverHeight or 90,
+        switchGap = config.switchGap or 8,
+        sideButtonSize = config.sideButtonSize or config.collapsedHeight or config.islandHeight or config.buttonHeight or 40,
+        musicWidth = config.musicWidth or config.collapsedWidth or config.islandWidth or 172,
+        musicPanelHeight = config.musicPanelHeight or 458,
+        musicLabel = config.musicLabel or "Music",
+        musicStatus = config.musicStatus or "San sang",
+        musicTrackTitle = config.musicTrackTitle or "Dac Cau Radio",
+        musicTrackSubtitle = config.musicTrackSubtitle or "Chua phat nhac",
+        musicIcon = config.musicIcon or "rbxassetid://10734905958",
+        feedbackIcon = config.feedbackIcon or "rbxassetid://6023426957",
+        favoriteIcon = config.favoriteIcon or config.heartIcon or "rbxassetid://10723406885",
+        repeatIcon = config.repeatIcon or "rbxassetid://10734933966",
+        repeatOneIcon = config.repeatOneIcon or "rbxassetid://10734933826",
+        musicPlaylist = config.musicPlaylist or config.playlist or defaultPlaylist,
+        musicFavorites = config.musicFavorites or config.savedMusic or {},
+        musicStorageFile = config.musicStorageFile or config.storageFile or "FeedBackDacCau",
+        persistMusicFavorites = config.persistMusicFavorites ~= false,
+        musicStartIndex = config.musicStartIndex or 1,
+        musicVolume = math.clamp(tonumber(config.musicVolume) or 0.45, 0, 1),
+        musicAutoPlay = config.musicAutoPlay == true,
+        musicSearchLimit = config.musicSearchLimit or 67,
+        musicSearchDebounce = config.musicSearchDebounce or 0.55,
+        musicSearchEndpoint = config.musicSearchEndpoint or "https://apis.roblox.com/toolbox-service/v2/assets:search",
+        buttonLabel = config.buttonLabel or "Feedback",
+        autoCollapseOnSuccess = config.autoCollapseOnSuccess ~= false,
+        successCollapseDelay = config.successCollapseDelay or 1.15,
+        accentColor = config.accentColor or Color3.fromRGB(64, 156, 255)
+    }
+
+    self.theme = buildTheme(self.config)
+    self.context = {scriptVersion = self.config.scriptVersion}
+    self.state = {
+        mounted = false, open = false, hidden = false, activeIsland = "feedback", sending = false, activeTab = "de_xuat_game",
+        fields = {de_xuat_game = {title = "", message = ""}, bao_loi_script = {title = "", message = ""}, khac = {title = "", message = ""}}
+    }
+
+    local masterPlaylist, initialFavorites = {}, {}
+    if type(self.config.musicPlaylist) == "table" then for _, item in ipairs(self.config.musicPlaylist) do table.insert(masterPlaylist, item) end end
+    if type(self.config.musicFavorites) == "table" then for _, item in ipairs(self.config.musicFavorites) do table.insert(initialFavorites, item) end end
+
+    self.music = {
+        masterPlaylist = masterPlaylist, playlist = masterPlaylist, favorites = initialFavorites, favoriteMap = {},
+        index = self.config.musicStartIndex, volume = self.config.musicVolume, muted = false,
+        playing = false, paused = false, repeatOne = false, viewMode = "playlist", queueSource = "playlist",
+        loadedSoundId = nil, searchResults = {}, status = self.config.musicStatus, storageLoaded = false, storageError = nil
+    }
+
+    self._connections, self._tweens, self._ui, self._reactiveSheens, self._musicSearchCache = {}, {}, {}, {}, {}
+    self._islandHovering, self._seekingProgress, self._draggingVolume, self._draggingSheet, self._ignoreGuiInset = false, false, false, false, true
+    self._animToken, self._toastToken, self._hideToken, self._submitToken, self._musicSearchToken, self._musicLoadToken, self._musicStatusHoldUntil = 0, 0, 0, 0, 0, 0, 0
+    return self
+end
+
+function FeedbackWidget:SetBackdropTarget(gui)
+    self.config.backdropGui = gui
+    if self.state.mounted and self.state.open then
+        local isMusic = self.state.activeIsland == "music"
+        self:_captureBackdropLens(isMusic and self._ui.musicPanel or self._ui.panel)
+    end
+end
+
+function FeedbackWidget:SetContext(ctx)
+    if type(ctx) ~= "table" then return end
+    for k, v in pairs(ctx) do self.context[k] = v end
+    self:_refreshMetaPreview()
+end
+
+function FeedbackWidget:_trackConnection(conn) table.insert(self._connections, conn); return conn end
+
+function FeedbackWidget:_cancelTweens(group)
+    if not self._tweens then return end
+    local function cancelList(list) for _, tw in ipairs(list) do pcall(function() tw:Cancel() end) end end
+    if group then if self._tweens[group] then cancelList(self._tweens[group]); self._tweens[group] = nil end; return end
+    for k, list in pairs(self._tweens) do cancelList(list); self._tweens[k] = nil end
+end
+
+function FeedbackWidget:_trackTween(group, obj, duration, props, style, direction)
+    if not obj then return nil end
+    self._tweens[group] = self._tweens[group] or {}
+    local list = self._tweens[group]
+    local tw = TweenService:Create(obj, TweenInfo.new(duration, style or Enum.EasingStyle.Quart, direction or Enum.EasingDirection.Out), props)
+    table.insert(list, tw)
+    local conn
+    conn = tw.Completed:Connect(function()
+        if conn then conn:Disconnect() end
+        local cur = self._tweens and self._tweens[group]
+        if cur then for i = #cur, 1, -1 do if cur[i] == tw then table.remove(cur, i) break end end end
+    end)
+    tw:Play()
+    return tw
+end
+
+function FeedbackWidget:_updateWorldBlur(open, instant)
+    local blurSize = tonumber(self.config.glassBlur) or 0
+    local wantBlur = open and self.config.liquidGlass and blurSize > 0 and self.config.useWorldBlur == true
+    local blur = self._worldBlur
+    if not wantBlur and not blur then return end
+
+    if wantBlur then
+        if not blur or not blur.Parent then
+            local ok, created = pcall(function() return create("BlurEffect", {Name = "DacCauLiquidGlassBlur_" .. tostring(self.config.guiName), Size = 0, Enabled = true}, Lighting) end)
+            if not ok then return end
+            blur, self._worldBlur = created, created
+        end
+        self:_cancelTweens("blur")
+        if instant then blur.Size = blurSize else self:_trackTween("blur", blur, 0.26, {Size = blurSize}) end
+    elseif blur then
+        self:_cancelTweens("blur")
+        if instant then pcall(function() blur:Destroy() end); self._worldBlur = nil
+        else
+            local tw = self:_trackTween("blur", blur, 0.20, {Size = 0})
+            if tw then
+                local c
+                c = tw.Completed:Connect(function()
+                    if c then c:Disconnect() end
+                    if not self.state.open and self._worldBlur == blur then pcall(function() blur:Destroy() end); self._worldBlur = nil end
+                end)
+            end
+        end
+    end
+end
+
+-- Per-Panel 3D Glass Acrylic Engine (Roblox DepthOfField + Glass Wedges) ----
+
+local function drawAcrylicTriangle(v1, v2, v3, p0, p1, meshId)
+    local s1, s2, s3 = (v1 - v2).Magnitude, (v2 - v3).Magnitude, (v3 - v1).Magnitude
+    local smax = math.max(s1, s2, s3)
+    if smax < 1e-4 then return p0, p1 end
+    local A, B, C
+    if s1 == smax then A, B, C = v1, v2, v3 elseif s2 == smax then A, B, C = v2, v3, v1 else A, B, C = v3, v1, v2 end
+
+    local ab = A - B
+    local abMag = ab.Magnitude
+    if abMag < 1e-4 then return p0, p1 end
+    local para = ((B.X - A.X) * (C.X - A.X) + (B.Y - A.Y) * (C.Y - A.Y) + (B.Z - A.Z) * (C.Z - A.Z)) / abMag
+    local perp = math.sqrt(math.max(0, (C - A).Magnitude ^ 2 - para * para))
+    if perp < 1e-4 then return p0, p1 end
+    local difPara = abMag - para
+
+    local st, za = CFrame.new(B, A), CFrame.Angles(math.pi / 2, 0, 0)
+    local topLook = (st * za).LookVector
+    local midPt = A + CFrame.new(A, B).LookVector * para
+    local needLook = CFrame.new(midPt, C).LookVector
+    local dot = math.clamp(topLook:Dot(needLook), -1, 1)
+    local angle = math.acos(dot)
+    local ac = CFrame.Angles(0, 0, angle)
+
+    local cf0 = st * ac
+    if ((cf0 * za).LookVector - needLook).Magnitude > 0.01 then cf0 = st * CFrame.Angles(0, 0, -angle) end
+    cf0 = cf0 * CFrame.new(0, perp / 2, -(difPara + para / 2))
+
+    local cf1 = st * ac * CFrame.Angles(0, math.pi, 0)
+    if ((cf1 * za).LookVector - needLook).Magnitude > 0.01 then cf1 = st * CFrame.Angles(0, 0, -angle) * CFrame.Angles(0, math.pi, 0) end
+    cf1 = cf1 * CFrame.new(0, perp / 2, difPara / 2)
+
+    local sz = 0.2
+    local function ensureWedge(part)
+        if part and part:FindFirstChild(meshId) then return part end
+        local p = create("Part", {
+            Anchored = true, CanCollide = false, CastShadow = false, Material = Enum.Material.Glass,
+            Transparency = 0.988, Color = Color3.fromRGB(150, 165, 188), Reflectance = 0,
+            Size = Vector3.new(sz, sz, sz), Name = "DacCauAcrylicWedge"
+        })
+        create("SpecialMesh", {Name = meshId, MeshType = Enum.MeshType.Wedge}, p)
+        return p
+    end
+
+    p0, p1 = ensureWedge(p0), ensureWedge(p1)
+    p0[meshId].Scale, p0.CFrame = Vector3.new(0, perp / sz, para / sz), cf0
+    p1[meshId].Scale, p1.CFrame = Vector3.new(0, perp / sz, difPara / sz), cf1
+    return p0, p1
+end
+
+function FeedbackWidget:_hideAcrylic()
+    local ac = self._acrylic
+    if not ac then return end
+    if ac.dof then
+        pcall(function() ac.dof.Enabled = false; ac.dof.Parent = nil end)
+    end
+    for _, pt in ipairs(ac.parts or {}) do
+        pcall(function() pt.Parent = nil end)
+    end
+end
+
+function FeedbackWidget:_destroyAcrylic()
+    local ac = self._acrylic
+    if not ac then return end
+    if ac.dof then pcall(function() ac.dof:Destroy() end) end
+    for _, pt in ipairs(ac.parts or {}) do pcall(function() pt:Destroy() end) end
+    self._acrylic = nil
+end
+
+function FeedbackWidget:_updateAcrylic()
+    local blurSize = tonumber(self.config.glassBlur) or 0
+    local screenGui = self._ui and self._ui.screenGui
+    local wantAcrylic = self.state.mounted and self.state.open and screenGui and screenGui.Parent ~= nil and self.config.liquidGlass and blurSize > 0 and self.config.useWorldBlur ~= true
+    if not wantAcrylic then self:_hideAcrylic(); return end
+
+    local cam = workspace.CurrentCamera
+    local isMusic = self.state.activeIsland == "music"
+    local activePanel = isMusic and self._ui.musicPanel or self._ui.panel
+    if not cam or not activePanel or not activePanel.Visible or not activePanel:IsDescendantOf(screenGui) then self:_hideAcrylic(); return end
+    local absSize = activePanel.AbsoluteSize
+    if absSize.X < 24 or absSize.Y < 24 then self:_hideAcrylic(); return end
+
+    local ac = self._acrylic
+    if not ac then
+        local ok, dof = pcall(function()
+            return create("DepthOfFieldEffect", {
+                Name = "DacCauAcrylicDOF_" .. tostring(self.config.guiName),
+                FarIntensity = 0, FocusDistance = 51.6, InFocusRadius = 50, NearIntensity = 0.45, Enabled = true
+            })
+        end)
+        if not ok then return end
+        ac = {dof = dof, parts = {}, meshId = "AcrylicWedge"}
+        self._acrylic = ac
+    end
+
+    local inset, bevel = 5, 20
+    local absPos = activePanel.AbsolutePosition
+    local x0, y0 = absPos.X + inset, absPos.Y + inset
+    local x1, y1 = absPos.X + absSize.X - inset, absPos.Y + absSize.Y - inset
+    if x1 - x0 <= bevel * 2 + 4 or y1 - y0 <= bevel * 2 + 4 then self:_hideAcrylic(); return end
+
+    local function rayPt(px, py)
+        return cam:ScreenPointToRay(px, py, 0.42).Origin
+    end
+
+    local ok, cTL, cTR, cBL, cBR, tL, tR, bL, bR, lT, lB, rT, rB = pcall(function()
+        return rayPt(x0 + bevel, y0 + bevel), rayPt(x1 - bevel, y0 + bevel),
+            rayPt(x0 + bevel, y1 - bevel), rayPt(x1 - bevel, y1 - bevel),
+            rayPt(x0 + bevel, y0), rayPt(x1 - bevel, y0),
+            rayPt(x0 + bevel, y1), rayPt(x1 - bevel, y1),
+            rayPt(x0, y0 + bevel), rayPt(x0, y1 - bevel),
+            rayPt(x1, y0 + bevel), rayPt(x1, y1 - bevel)
+    end)
+    if not ok or cTL.X ~= cTL.X or cBR.X ~= cBR.X then self:_hideAcrylic(); return end
+
+    if not ac.dof.Parent then ac.dof.Parent = Lighting end
+    ac.dof.Enabled = true
+    local quads = {
+        {cTL, cTR, cBL, cBR},
+        {tL, tR, cTL, cTR},
+        {cBL, cBR, bL, bR},
+        {lT, cTL, lB, cBL},
+        {cTR, rT, cBR, rB}
+    }
+    for idx, q in ipairs(quads) do
+        local pIdx = (idx - 1) * 4
+        ac.parts[pIdx + 1], ac.parts[pIdx + 2] = drawAcrylicTriangle(q[1], q[2], q[3], ac.parts[pIdx + 1], ac.parts[pIdx + 2], ac.meshId)
+        ac.parts[pIdx + 3], ac.parts[pIdx + 4] = drawAcrylicTriangle(q[3], q[2], q[4], ac.parts[pIdx + 3], ac.parts[pIdx + 4], ac.meshId)
+    end
+    for _, pt in ipairs(ac.parts) do
+        if pt and pt.Parent ~= cam then pt.Parent = cam end
+    end
+end
+
+-- 2D Hub Convex Lens & Edge Refraction Engine -------------------------------
+
+local SYSTEM_GUI_SKIP = {
+    RobloxGui = true, TopBarApp = true, BubbleChat = true, Chat = true, PlayerList = true,
+    TouchGui = true, PurchasePromptApp = true, CoreScriptLocalization = true, Freecam = true,
+    HeadsetDisconnectedDialog = true, RobloxPromptGui = true, RobloxLoadingGui = true,
+    DevConsoleMaster = true, TeleportGui = true
+}
+
+local LENS_KEEP_MODIFIERS = {
+    UICorner = true, UIGradient = true, UIStroke = true, UIPadding = true,
+    UIListLayout = true, UIGridLayout = true, UIPageLayout = true, UITableLayout = true,
+    UIAspectRatioConstraint = true, UISizeConstraint = true, UITextSizeConstraint = true, UIScale = true
+}
+
+local function makeLensGroup(parent, zIndex, transp, tint, rot, edgeSeq, sizeScale, radius)
+    local ok, grp = pcall(function()
+        return create("CanvasGroup", {
+            BackgroundTransparency = 1, BorderSizePixel = 0,
+            AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
+            Size = UDim2.fromScale(sizeScale or 1, sizeScale or 1),
+            GroupTransparency = transp or 0, GroupColor3 = tint or Color3.fromRGB(255, 255, 255), ZIndex = zIndex
+        }, parent)
+    end)
+    if not ok or not grp then
+        grp = create("Frame", {
+            BackgroundTransparency = 1, ClipsDescendants = true,
+            AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
+            Size = UDim2.fromScale(sizeScale or 1, sizeScale or 1), ZIndex = zIndex
+        }, parent)
+    end
+    local c = addCorner(grp, radius or UDim.new(1, 0))
+    if edgeSeq then
+        create("UIGradient", {Rotation = rot or 45, Transparency = edgeSeq}, grp)
+    end
+    return grp, c
+end
+
+function FeedbackWidget:_ensurePanelLensRig(panel)
+    self._lensRigs = self._lensRigs or {}
+    if self._lensRigs[panel] then return self._lensRigs[panel] end
+
+    local root = create("Frame", {Name = "LiquidLensRoot", BackgroundTransparency = 1, ClipsDescendants = true, Size = UDim2.fromScale(1, 1), Visible = false, ZIndex = 13}, panel)
+    local rootCorner = addCorner(root, UDim.new(1, 0))
+
+    -- mainWave: container trong suốt hoàn toàn - chỉ để clip strips, không tô màu
+    local mainWave, mainCorner = makeLensGroup(root, 13, 0, Color3.new(1,1,1), nil, nil, 1)
+    -- Không dùng blurWave riêng nữa (gây ra blob chói)
+    local blurWave = mainWave  -- alias, dùng chung container
+
+    local function buildStrips(parent, count)
+        local strips = {}
+        for i = 1, count do
+            local t0 = (i - 1) / count
+            local s = create("Frame", {
+                Name = "WaveStrip_" .. tostring(i), BackgroundTransparency = 1, ClipsDescendants = true,
+                Position = UDim2.fromScale(0, t0), Size = UDim2.new(1, 0, 1 / count, 1), ZIndex = 13
+            }, parent)
+            strips[i] = {frame = s, t0 = t0, t = (i - 0.5) / count, entries = {}}
+        end
+        return strips
+    end
+
+    local mainStrips = buildStrips(mainWave, 12)
+    -- blurStrips dùng lại mainStrips (không tạo thêm strips chói)
+    local blurStrips = mainStrips
+
+    -- Veil: CHỈ là lớp mờ cực nhẹ phía trên clone, KHÔNG gradient "mặt trời"
+    local veil = create("Frame", {
+        Name = "FrostedVeil",
+        BackgroundColor3 = self.theme.glassStyle == "light"
+            and Color3.fromRGB(240, 245, 255)
+            or  Color3.fromRGB(18, 22, 36),
+        BackgroundTransparency = 0.94,  -- cực trong suốt, chỉ tô nhẹ
+        BorderSizePixel = 0, Size = UDim2.fromScale(1, 1), Visible = false, ZIndex = 14
+    }, panel)
+    local veilCorner = addCorner(veil, UDim.new(1, 0))
+    -- KHÔNG thêm UIGradient vào veil - đó là nguồn gây "mặt trời"
+
+    local glass = self._glass and self._glass[panel]
+    if glass and glass.lensCorners then
+        for _, c in ipairs({rootCorner, mainCorner, veilCorner}) do
+            table.insert(glass.lensCorners, c)
+        end
+    end
+
+    local rig = {root = root, mainWave = mainWave, blurWave = blurWave, mainStrips = mainStrips, blurStrips = blurStrips, veil = veil, entries = {}, activePanel = panel}
+    self._lensRigs[panel] = rig
+    return rig
+end
+
+function FeedbackWidget:_cloneGuiForLens(src)
+    local budget = {count = 0, limit = 80}
+    local function sanitizeNode(node, srcNode)
+        if node:IsA("GuiObject") then
+            pcall(function() node.Active = false; node.Selectable = false end)
+            if node:IsA("TextBox") then pcall(function() node.TextEditable = false end) end
+            if node:IsA("ScrollingFrame") and srcNode and srcNode:IsA("ScrollingFrame") then
+                pcall(function() node.CanvasPosition = srcNode.CanvasPosition end)
+            end
+        end
+    end
+
+    local function copyVisible(node, depth)
+        if budget.count >= budget.limit or depth > 6 then return nil end
+        if node:IsA("BaseScript") or node:IsA("Sound") or node:IsA("BillboardGui") or node:IsA("SurfaceGui") then return nil end
+        if node:IsA("GuiObject") then
+            if not node.Visible then return nil end
+        elseif not LENS_KEEP_MODIFIERS[node.ClassName] and not node:IsA("Folder") then
+            return nil
+        end
+
+        local okCopy, copyObj = pcall(function()
+            local prevArchivable = node.Archivable
+            node.Archivable = true
+            local cloneShallow = node:Clone()
+            node.Archivable = prevArchivable
+            if cloneShallow then
+                for _, c in ipairs(cloneShallow:GetChildren()) do c:Destroy() end
+            end
+            return cloneShallow
+        end)
+        if not okCopy or not copyObj then return nil end
+        if node:IsA("GuiObject") then budget.count = budget.count + 1 end
+        sanitizeNode(copyObj, node)
+
+        for _, child in ipairs(node:GetChildren()) do
+            if budget.count >= budget.limit then break end
+            local childCopy = copyVisible(child, depth + 1)
+            if childCopy then childCopy.Parent = copyObj end
+        end
+        return copyObj
+    end
+
+    return copyVisible(src, 0)
+end
+
+function FeedbackWidget:_scanBackdropWindows()
+    local ownGui = self._ui and self._ui.screenGui
+    local targets, seenGuis, windows = {}, {}, {}
+
+    local function pushGui(gui)
+        if not gui or seenGuis[gui] or gui == ownGui then return end
+        if gui:IsA("ScreenGui") and gui.Enabled and not SYSTEM_GUI_SKIP[gui.Name] then
+            if ownGui and (gui.DisplayOrder or 0) > (ownGui.DisplayOrder or 100) then return end
+            seenGuis[gui] = true
+            table.insert(targets, gui)
+        end
+    end
+
+    if self.config.backdropGui then
+        if typeof(self.config.backdropGui) == "Instance" then
+            if self.config.backdropGui:IsA("ScreenGui") then
+                pushGui(self.config.backdropGui)
+            elseif self.config.backdropGui:IsA("GuiObject") then
+                local ancestorGui = self.config.backdropGui:FindFirstAncestorOfClass("ScreenGui")
+                table.insert(windows, {source = self.config.backdropGui, sourceGui = ancestorGui})
+                return windows
+            end
+        end
+    end
+
+    local roots = {}
+    if ownGui and ownGui.Parent then table.insert(roots, ownGui.Parent) end
+    pcall(function() if type(gethui) == "function" then table.insert(roots, gethui()) end end)
+    pcall(function() table.insert(roots, CoreGui) end)
+    pcall(function()
+        local plr = Players.LocalPlayer
+        local pg = plr and plr:FindFirstChildOfClass("PlayerGui")
+        if pg then table.insert(roots, pg) end
+    end)
+
+    for _, root in ipairs(roots) do
+        pcall(function()
+            for _, child in ipairs(root:GetChildren()) do pushGui(child) end
+        end)
+    end
+
+    for _, gui in ipairs(targets) do
+        for _, child in ipairs(gui:GetChildren()) do
+            if child:IsA("GuiObject") and child.Visible and child.AbsoluteSize.X >= 80 and child.AbsoluteSize.Y >= 50 then
+                table.insert(windows, {source = child, sourceGui = gui})
+            end
+        end
+    end
+    return windows
+end
+
+function FeedbackWidget:_clearBackdropLens(panel)
+    self._lensCaptureToken = (self._lensCaptureToken or 0) + 1
+    if not self._lensRigs then return end
+    local function wipeRig(rig)
+        if not rig then return end
+        for _, s in ipairs(rig.mainStrips or {}) do
+            for _, node in ipairs(s.entries or {}) do
+                if node.wrap then pcall(function() node.wrap:Destroy() end) end
+            end
+            s.entries = {}
+        end
+        rig.entries = {}
+        if rig.root then rig.root.Visible = false end
+        if rig.veil then rig.veil.Visible = false end
+    end
+    if panel then wipeRig(self._lensRigs[panel]) else for _, rig in pairs(self._lensRigs) do wipeRig(rig) end end
+    if not panel then self._activeLensPanel = nil end
+end
+
+function FeedbackWidget:_captureBackdropLens(panel)
+    if not panel then return end
+    local rig = self:_ensurePanelLensRig(panel)
+    self:_clearBackdropLens(panel)
+    self._activeLensPanel = panel
+    self._lensCaptureToken = (self._lensCaptureToken or 0) + 1
+    local captureToken = self._lensCaptureToken
+
+    if not self.config.liquidGlass or not self.config.backdropLens then
+        rig.veil.Visible = false
+        panel.BackgroundTransparency = self.theme.panelTransparency
+        return
+    end
+
+    rig.root.Visible = true
+    rig.veil.Visible = true
+
+    local windows = self:_scanBackdropWindows()
+    if #windows == 0 then
+        panel.BackgroundTransparency = self.theme.panelTransparency
+        return
+    end
+
+    panel.BackgroundTransparency = 0.96
+
+    task.spawn(function()
+        for _, win in ipairs(windows) do
+            if captureToken ~= self._lensCaptureToken or not self.state.mounted or not self.state.open then return end
+            local src, srcGui = win.source, win.sourceGui
+            if src and src.Parent then
+                local guiScaleObj = srcGui and srcGui:FindFirstChildOfClass("UIScale")
+                local guiScale = (guiScaleObj and guiScaleObj.Scale > 0) and guiScaleObj.Scale or 1
+                local srcScaleObj = src:FindFirstChildOfClass("UIScale")
+                local srcScale = (srcScaleObj and srcScaleObj.Scale > 0) and srcScaleObj.Scale or 1
+                local totalSrcScale = math.max(0.1, guiScale * srcScale)
+                local unscaledW = src.AbsoluteSize.X / totalSrcScale
+                local unscaledH = src.AbsoluteSize.Y / totalSrcScale
+
+                local baseClone = self:_cloneGuiForLens(src)
+                if baseClone then
+                    local cloneScale = baseClone:FindFirstChildOfClass("UIScale")
+                    if cloneScale then cloneScale:Destroy() end
+                    baseClone.AnchorPoint = Vector2.new(0, 0)
+                    baseClone.Size = UDim2.fromOffset(unscaledW, unscaledH)
+
+                    local stripNodes = {}
+                    local entry = {source = src, sourceGui = srcGui, nodes = stripNodes}
+                    table.insert(rig.entries, entry)
+
+                    local BASE_MAG = 1.04
+                    local BULGE = 0.42
+                    for idx, s in ipairs(rig.mainStrips) do
+                        if captureToken ~= self._lensCaptureToken or not self.state.mounted or not self.state.open then
+                            if idx == 1 then pcall(function() baseClone:Destroy() end) end
+                            return
+                        end
+                        local cloneObj = (idx == 1) and baseClone or baseClone:Clone()
+                        if cloneObj then
+                            local wrap = create("Frame", {
+                                BackgroundTransparency = 1, BorderSizePixel = 0,
+                                AnchorPoint = Vector2.new(0, 0),
+                                Size = UDim2.fromOffset(unscaledW, unscaledH), ZIndex = 13
+                            }, s.frame)
+                            local scaleInst = create("UIScale", {Scale = totalSrcScale}, wrap)
+                            cloneObj.Parent = wrap
+                            local rec = {
+                                wrap = wrap, scale = scaleInst, strip = s,
+                                baseMag = BASE_MAG, bulgeFactor = BULGE
+                            }
+                            table.insert(s.entries, rec)
+                            table.insert(stripNodes, rec)
+                        end
+                        if idx % 3 == 0 then
+                            self:_updateBackdropLens()
+                            RunService.Heartbeat:Wait()
+                        end
+                    end
+                    self:_updateBackdropLens()
+                end
+            end
+        end
+    end)
+end
+
+function FeedbackWidget:_updateBackdropLens()
+    if not self.state.mounted or not self.state.open or not self._activeLensPanel then return end
+    local panel = self._activeLensPanel
+    local rig = self._lensRigs and self._lensRigs[panel]
+    if not rig or not rig.root.Visible or #rig.entries == 0 then return end
+
+    local panelPos = panel.AbsolutePosition
+    local pSize = panel.AbsoluteSize
+    if pSize.X <= 4 or pSize.Y <= 4 then return end
+    local pcX = panelPos.X + pSize.X * 0.5
+    local pcY = panelPos.Y + pSize.Y * 0.5
+
+    local phase = os.clock() * 1.15
+
+    for _, entry in ipairs(rig.entries) do
+        local src, srcGui = entry.source, entry.sourceGui
+        local alive = src and src.Parent ~= nil and src.Visible and (not srcGui or srcGui.Enabled)
+        if not alive then
+            for _, rec in ipairs(entry.nodes) do rec.wrap.Visible = false end
+        else
+            local srcPos = src.AbsolutePosition
+            local guiScaleObj = srcGui and srcGui:FindFirstChildOfClass("UIScale")
+            local guiScale = (guiScaleObj and guiScaleObj.Scale > 0) and guiScaleObj.Scale or 1
+            local srcScaleObj = src:FindFirstChildOfClass("UIScale")
+            local srcScale = (srcScaleObj and srcScaleObj.Scale > 0) and srcScaleObj.Scale or 1
+            local totalSrcScale = math.max(0.1, guiScale * srcScale)
+
+            for _, rec in ipairs(entry.nodes) do
+                local t = rec.strip.t
+                local t0 = rec.strip.t0 or (t - 0.5 / 12)
+                local dist = t - 0.5
+                local bulge = 1 - 4 * dist * dist
+                local mag = rec.baseMag + rec.bulgeFactor * bulge
+                local waveX = math.sin(t * 7.0 + phase) * 5 * bulge
+                local waveY = math.cos(t * 5.2 + phase * 0.85) * 3 * bulge
+
+                local targetSrcX = pcX + (srcPos.X - pcX) * mag
+                local targetSrcY = pcY + (srcPos.Y - pcY) * mag
+                local stripTopY = panelPos.Y + t0 * pSize.Y
+
+                rec.wrap.Visible = true
+                rec.scale.Scale = totalSrcScale * mag
+                rec.wrap.Position = UDim2.fromOffset((targetSrcX - panelPos.X) + waveX, (targetSrcY - stripTopY) + waveY)
+            end
+        end
+    end
+end
+
+-- Safe Area, Dynamic Island Layout & Auto-Hide -------------------------------
+
+function FeedbackWidget:_getSafeTopBase()
+    if not self.config.respectTopInset or not self._ignoreGuiInset then return 0 end
+    local ok, topLeft = pcall(function() return GuiService:GetGuiInset() end)
+    local insetY = (ok and topLeft and type(topLeft.Y) == "number") and topLeft.Y or 0
+    return insetY > 0 and insetY or 36
+end
+
+function FeedbackWidget:_getScreenSize()
+    local gui = self._ui.screenGui
+    if gui and gui.AbsoluteSize and gui.AbsoluteSize.X > 0 and gui.AbsoluteSize.Y > 0 then return gui.AbsoluteSize end
+    local cam = workspace.CurrentCamera
+    return cam and cam.ViewportSize or Vector2.new(1920, 1080)
+end
+
+function FeedbackWidget:_getExpandedTop() return self:_getSafeTopBase() + (self.config.expandedTopOffset or 12) end
+
+function FeedbackWidget:_collapsedLayout(mode, hidden)
+    local activeMode = mode or self.state.activeIsland or "feedback"
+    local h, circle, gap = self.config.collapsedHeight, self.config.sideButtonSize, self.config.switchGap
+    local fbW = activeMode == "feedback" and self.config.collapsedWidth or circle
+    local muW = activeMode == "music" and self.config.musicWidth or circle
+    local totalW = fbW + gap + muW
+    local top = hidden and (self.config.hiddenTopOffset ~= nil and self.config.hiddenTopOffset or -(h + 18)) or (self:_getSafeTopBase() + (self.config.topOffset or 10))
+    return {
+        feedback = {position = UDim2.new(0.5, -totalW / 2 + fbW / 2, 0, top), size = UDim2.fromOffset(fbW, h)},
+        music = {position = UDim2.new(0.5, totalW / 2 - muW / 2, 0, top), size = UDim2.fromOffset(muW, h)}
+    }
+end
+
+function FeedbackWidget:_getSheetBounds(isMusic)
+    local screen, expandedTop = self:_getScreenSize(), self:_getExpandedTop()
+    local w = math.min(self.config.panelWidth, math.max(self.config.collapsedWidth, screen.X - 24))
+    local h = math.min(isMusic and self.config.musicPanelHeight or self.config.panelHeight, math.max(self.config.collapsedHeight, screen.Y - expandedTop - 16))
+    if self._sheetCustomPos then
+        local minX, maxX = w * 0.5 + 8, math.max(w * 0.5 + 8, screen.X - w * 0.5 - 8)
+        local minY, maxY = self:_getSafeTopBase() + 6, math.max(self:_getSafeTopBase() + 6, screen.Y - h - 8)
+        return UDim2.fromOffset(w, h), UDim2.fromOffset(math.clamp(self._sheetCustomPos.X, minX, maxX), math.clamp(self._sheetCustomPos.Y, minY, maxY))
+    end
+    local maxY = math.max(expandedTop, screen.Y - h - 16)
+    local openY = math.clamp(math.floor(screen.Y * 0.45 - h * 0.5), expandedTop, maxY)
+    return UDim2.fromOffset(w, h), UDim2.new(0.5, 0, 0, openY)
+end
+
+function FeedbackWidget:_syncShadow(shadow, pos, size, visible)
+    if shadow then shadow.Position, shadow.Size, shadow.Visible = pos, size, visible ~= false end
+end
+
+function FeedbackWidget:_syncCollapsedContent(mode)
+    local ui, isFb = self._ui, (mode or self.state.activeIsland) == "feedback"
+    if ui.collapsedFeedbackIconOnly then ui.collapsedFeedbackIconOnly.Visible = not isFb end
+    if ui.collapsedFeedbackFull then ui.collapsedFeedbackFull.Visible = isFb end
+    if ui.collapsedMusicIconOnly then ui.collapsedMusicIconOnly.Visible = isFb end
+    if ui.collapsedMusicFull then ui.collapsedMusicFull.Visible = not isFb end
+end
+
+function FeedbackWidget:_applyCollapsedLayout(animate, mode)
+    local ui = self._ui
+    if not ui.panel or not ui.musicPanel then return end
+    local activeMode = mode or self.state.activeIsland or "feedback"
+    self.state.activeIsland = activeMode
+    local hidden = self.state.hidden and not self.state.open
+    local layout = self:_collapsedLayout(activeMode, hidden)
+    self:_syncCollapsedContent(activeMode)
+    ui.panel.Visible, ui.musicPanel.Visible = not hidden, not hidden
+    if ui.panelContent then ui.panelContent.Visible = false end
+    if ui.musicContent then ui.musicContent.Visible = false end
+
+    self:_cancelTweens("layout")
+    if animate then
+        for _, pair in ipairs({{ui.panel, ui.panelShadow, layout.feedback}, {ui.musicPanel, ui.musicShadow, layout.music}}) do
+            self:_trackTween("layout", pair[1], 0.28, {Size = pair[3].size, Position = pair[3].position}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+            if pair[2] then pair[2].Visible = false end
+        end
+    else
+        ui.panel.Size, ui.panel.Position = layout.feedback.size, layout.feedback.position
+        ui.musicPanel.Size, ui.musicPanel.Position = layout.music.size, layout.music.position
+        self:_syncShadow(ui.panelShadow, layout.feedback.position, layout.feedback.size, false)
+        self:_syncShadow(ui.musicShadow, layout.music.position, layout.music.size, false)
+    end
+end
+
+function FeedbackWidget:_animatePeekTab(show, instant)
+    local peek = self._ui.peekTab
+    if not peek then return end
+    local targetPos = UDim2.new(0.5, 0, 0, show and (self:_getSafeTopBase() + 4) or -36)
+    self:_cancelTweens("peek")
+    if instant then peek.Position, peek.Visible = targetPos, show; return end
+    if show then peek.Visible = true end
+    local tw = self:_trackTween("peek", peek, 0.22, {Position = targetPos})
+    if not show and tw then
+        local c
+        c = tw.Completed:Connect(function() if c then c:Disconnect() end; if self.state.mounted and not self.state.hidden then peek.Visible = false end end)
+    end
+end
+
+function FeedbackWidget:_setIslandHidden(hidden, instant)
+    if (self.state.open and hidden) or (self.state.hidden == hidden and not instant) then return end
+    self.state.hidden = hidden
+    self._hideToken = (self._hideToken or 0) + 1
+    local hideToken, ui = self._hideToken, self._ui
+    if hidden then self._islandHovering = false end
+    local layout = self:_collapsedLayout(self.state.activeIsland, hidden)
+    self:_cancelTweens("hide")
+
+    if instant then
+        ui.panel.Position, ui.panel.Size, ui.panel.Visible = layout.feedback.position, layout.feedback.size, not hidden
+        ui.musicPanel.Position, ui.musicPanel.Size, ui.musicPanel.Visible = layout.music.position, layout.music.size, not hidden
+        self:_syncShadow(ui.panelShadow, layout.feedback.position, layout.feedback.size, false)
+        self:_syncShadow(ui.musicShadow, layout.music.position, layout.music.size, false)
+        self:_animatePeekTab(hidden, true)
+        return
+    end
+    if not hidden then
+        ui.panel.Visible, ui.musicPanel.Visible = true, true
+        if ui.panelShadow then ui.panelShadow.Visible = false end
+        if ui.musicShadow then ui.musicShadow.Visible = false end
+        self:_animatePeekTab(false, false)
+    end
+    for _, pair in ipairs({{ui.panel, ui.panelShadow, layout.feedback}, {ui.musicPanel, ui.musicShadow, layout.music}}) do
+        self:_trackTween("hide", pair[1], 0.24, {Position = pair[3].position, Size = pair[3].size})
+    end
+    if hidden then
+        task.delay(0.25, function()
+            if hideToken ~= self._hideToken or not self.state.mounted or not self.state.hidden or self.state.open then return end
+            ui.panel.Visible, ui.musicPanel.Visible = false, false
+            if ui.panelShadow then ui.panelShadow.Visible = false end
+            if ui.musicShadow then ui.musicShadow.Visible = false end
+            self:_animatePeekTab(true, false)
+        end)
+    end
+end
+
+function FeedbackWidget:_isPointerNearIsland()
+    local pos, screen = UserInputService:GetMouseLocation(), self:_getScreenSize()
+    local cx, halfW = screen.X * 0.5, (self.config.revealHoverWidth or 340) * 0.5
+    return pos.X >= cx - halfW and pos.X <= cx + halfW and pos.Y >= 0 and pos.Y <= (self:_getSafeTopBase() + (self.config.revealHoverHeight or 90))
+end
+
+function FeedbackWidget:_hasFocusedInput()
+    local focused = UserInputService:GetFocusedTextBox()
+    return focused ~= nil and self._ui.screenGui ~= nil and focused:IsDescendantOf(self._ui.screenGui)
+end
+
+function FeedbackWidget:_scheduleAutoHide()
+    self._hideToken = (self._hideToken or 0) + 1
+    local token, delaySec = self._hideToken, tonumber(self.config.autoHideDelay) or 10
+    if delaySec <= 0 then return end
+    task.delay(delaySec, function()
+        if token ~= self._hideToken or not self.state.mounted or self.state.open then return end
+        if self._islandHovering or self:_hasFocusedInput() or self:_isPointerNearIsland() then self:_scheduleAutoHide(); return end
+        self:_setIslandHidden(true, false)
+    end)
+end
+
+function FeedbackWidget:_markIslandActivity()
+    if not self.state.mounted then return end
+    if self.state.hidden and not self.state.open then self:_setIslandHidden(false, false) end
+    if not self.state.open then self:_scheduleAutoHide() end
+end
+
+function FeedbackWidget:_updateReactiveSheens(mousePos)
+    for _, item in ipairs(self._reactiveSheens) do
+        local h, rg = item.host, item.rimGrad
+        if h and rg and h.Visible and h.AbsoluteSize.X > 0 and h.AbsoluteSize.Y > 0 then
+            local rx = math.clamp((mousePos.X - h.AbsolutePosition.X) / h.AbsoluteSize.X, 0, 1) - 0.5
+            local ry = math.clamp((mousePos.Y - h.AbsolutePosition.Y) / h.AbsoluteSize.Y, 0, 1) - 0.5
+            rg.Rotation = 45 + rx * 26
+            rg.Offset = Vector2.new(math.clamp(rx * 0.18, -0.14, 0.14), math.clamp(ry * 0.12, -0.08, 0.08))
+        end
+    end
+end
+
+-- Toast, Feedback Logic & Sheet Transitions ----------------------------------
+
+function FeedbackWidget:_setStatus(text, mode)
+    local lbl = self._ui.statusLabel
+    if not lbl then return end
+    lbl.Text = text or ""
+    lbl.TextColor3 = mode == "ok" and self.theme.ok or (mode == "err" and self.theme.err or self.theme.textDim)
+end
+
+function FeedbackWidget:_showToast(text, mode)
+    local ui = self._ui
+    if not ui.toast or not ui.toastText then return end
+    self._toastToken = (self._toastToken or 0) + 1
+    local token, color = self._toastToken, mode == "ok" and self.theme.ok or (mode == "err" and self.theme.err or self.theme.accent)
+
+    ui.toastText.Text = shortenText(text or "", 58)
+    if ui.toastDot then ui.toastDot.BackgroundColor3 = color end
+    if ui.toastStroke then ui.toastStroke.Color, ui.toastStroke.Transparency = color, 0.28 end
+
+    local safeY = self:_getSafeTopBase() + 10
+    self:_cancelTweens("toast")
+    ui.toast.Position, ui.toast.BackgroundTransparency, ui.toastText.TextTransparency, ui.toast.Visible = UDim2.new(0.5, 0, 0, safeY - 14), 0.72, 0.8, true
+    if ui.toastDot then ui.toastDot.BackgroundTransparency = 0 end
+    self:_trackTween("toast", ui.toast, 0.24, {Position = UDim2.new(0.5, 0, 0, safeY), BackgroundTransparency = self.theme.islandTransparency}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+    self:_trackTween("toast", ui.toastText, 0.20, {TextTransparency = 0})
+
+    task.delay(2.5, function()
+        if token ~= self._toastToken or not self.state.mounted then return end
+        local tw = self:_trackTween("toast", ui.toast, 0.20, {Position = UDim2.new(0.5, 0, 0, safeY - 12), BackgroundTransparency = 1})
+        self:_trackTween("toast", ui.toastText, 0.18, {TextTransparency = 1})
+        if ui.toastDot then self:_trackTween("toast", ui.toastDot, 0.18, {BackgroundTransparency = 1}) end
+        if ui.toastStroke then self:_trackTween("toast", ui.toastStroke, 0.18, {Transparency = 1}) end
+        if tw then
+            local c
+            c = tw.Completed:Connect(function() if c then c:Disconnect() end; if token == self._toastToken and ui.toast then ui.toast.Visible = false end end)
+        end
+    end)
+end
+
+function FeedbackWidget:_buildMeta()
+    local plr, level = Players.LocalPlayer, self.context.level
+    if level == nil then local ok, v = pcall(function() return plr.Data.Level.Value end); if ok then level = v end end
+    return {
+        username = plr and plr.Name or "unknown", userId = plr and plr.UserId or 0,
+        placeId = game.PlaceId, jobId = game.JobId or "", world = self.context.world or "unknown",
+        level = level or "unknown", scriptVersion = self.context.scriptVersion or "unknown",
+        executor = self.context.executor or getExecutorName(), timestamp = toIsoTimestamp()
+    }
+end
+
+function FeedbackWidget:_refreshMetaPreview()
+    local chips = self._ui.metaChips
+    if not chips then return end
+    local meta = self:_buildMeta()
+    local map = {user = meta.username, world = meta.world, level = meta.level, executor = meta.executor}
+    for k, lbl in pairs(chips) do lbl.Text = shortenText(tostring(map[k] or "unknown"), 18) end
+end
+
+function FeedbackWidget:_buildWebhookPayload(category, title, message)
+    local meta, cfg = self:_buildMeta(), TAB_CONFIG[category] or TAB_CONFIG.khac
+    local diag = table.concat({
+        "user: " .. tostring(meta.username) .. " (" .. tostring(meta.userId) .. ")",
+        "placeId: " .. tostring(meta.placeId), "jobId: " .. tostring(meta.jobId),
+        "world: " .. tostring(meta.world), "level: " .. tostring(meta.level),
+        "scriptVersion: " .. tostring(meta.scriptVersion), "executor: " .. tostring(meta.executor),
+        "timestamp: " .. tostring(meta.timestamp)
+    }, "\n")
+    return {
+        username = "DacCau Feedback Bot",
+        embeds = {{
+            title = shortenText("[Feedback] " .. cfg.label, 256),
+            description = shortenText(message, 4096),
+            color = 3447003,
+            fields = {
+                {name = "Title", value = shortenText(title ~= "" and title or "(no title)", 1024), inline = false},
+                {name = "Category", value = shortenText(category, 256), inline = true},
+                {name = "Player", value = shortenText(tostring(meta.username), 256), inline = true},
+                {name = "Diagnostics", value = shortenText(diag, 1024), inline = false}
+            }
+        }},
+        content = ""
+    }
+end
+
+function FeedbackWidget:_positionSegmentIndicator(indicator, items, activeIndex, animate)
+    if not indicator or not items or #items == 0 then return end
+    local count, idx = #items, math.clamp(activeIndex or 1, 1, #items)
+    local sz, pos = UDim2.new(1 / count, -4, 1, -4), UDim2.new((idx - 1) / count, 2, 0, 2)
+    if animate then self:_trackTween("segment", indicator, 0.26, {Size = sz, Position = pos})
+    else indicator.Size, indicator.Position = sz, pos end
+end
+
+function FeedbackWidget:_setTab(tabKey, instant)
+    if not TAB_CONFIG[tabKey] then return end
+    local cur = self.state.activeTab
+    if self._ui.titleBox and self._ui.messageBox and self.state.fields[cur] then
+        self.state.fields[cur].title, self.state.fields[cur].message = self._ui.titleBox.Text, self._ui.messageBox.Text
+    end
+    self.state.activeTab = tabKey
+    local cfg, draft = TAB_CONFIG[tabKey], self.state.fields[tabKey] or {title = "", message = ""}
+    if self._ui.titleBox then self._ui.titleBox.PlaceholderText, self._ui.titleBox.Text = cfg.hintTitle, draft.title or "" end
+    if self._ui.messageBox then self._ui.messageBox.PlaceholderText, self._ui.messageBox.Text = cfg.hintBody, draft.message or "" end
+    local activeIdx = 1
+    for i, key in ipairs(TAB_ORDER) do
+        local btn, selected = self._ui.tabButtons and self._ui.tabButtons[key], key == tabKey
+        if selected then activeIdx = i end
+        if btn then btn.TextColor3 = selected and self.theme.text or self.theme.textDim; btn.Font = selected and FONT_BOLD or FONT_MEDIUM end
+    end
+    self:_positionSegmentIndicator(self._ui.feedbackTabIndicator, TAB_ORDER, activeIdx, not instant)
+end
+
+function FeedbackWidget:_setSendingState(sending)
+    self.state.sending = sending
+    local btn = self._ui.submitButton
+    if btn then
+        btn.Text = sending and "Dang gui..." or "Gui phan hoi"
+        btn.AutoButtonColor = not sending
+        btn.BackgroundColor3 = sending and self.theme.accentDim or self.theme.accent
+    end
+end
+
+function FeedbackWidget:_applyGlassRadius(frame, targetRadius, duration, expanded)
+    local glass = self._glass and self._glass[frame]
+    if not glass then
+        local c = frame and frame:FindFirstChildOfClass("UICorner")
+        if c then
+            if duration then self:_trackTween("panel", c, duration, {CornerRadius = targetRadius}) else c.CornerRadius = targetRadius end
+        end
+        return
+    end
+    local innerRadius = shrinkCornerRadius(targetRadius, 1)
+    for _, pair in ipairs({{glass.mainCorner, targetRadius}, {glass.bevelCorner, innerRadius}}) do
+        if pair[1] then
+            if duration then self:_trackTween("panel", pair[1], duration, {CornerRadius = pair[2]}) else pair[1].CornerRadius = pair[2] end
+        end
+    end
+    for _, c in ipairs(glass.lensCorners or {}) do
+        if duration then self:_trackTween("panel", c, duration, {CornerRadius = targetRadius}) else c.CornerRadius = targetRadius end
+    end
+    if expanded ~= nil then
+        if glass.panelGrad then glass.panelGrad.Transparency = expanded and SHEET_BG_SEQ or ISLAND_BG_SEQ end
+        if glass.outerStroke then glass.outerStroke.Thickness = expanded and 1.5 or 1.25 end
+    end
+end
+
+function FeedbackWidget:_syncShadowImg(img, expanded, duration)
+    if not img then return end
+    local props = expanded
+        and {Size = UDim2.new(1, 34, 1, 34), Position = UDim2.new(0.5, 0, 0.5, 5), ImageTransparency = 0.78}
+        or {Size = UDim2.new(1, 22, 1, 22), Position = UDim2.new(0.5, 0, 0.5, 3), ImageTransparency = 0.84}
+    if duration then
+        self:_trackTween("panel", img, duration, props)
+    else
+        img.Size, img.Position, img.ImageTransparency = props.Size, props.Position, props.ImageTransparency
+    end
+end
+
+function FeedbackWidget:_setSheetOpen(targetIsland, open, instant)
+    self.state.activeIsland = targetIsland or self.state.activeIsland
+    local isMusic = self.state.activeIsland == "music"
+    self.state.open, self._islandHovering = open == true, false
+    if open then self.state.hidden = false end
+    self._animToken = (self._animToken or 0) + 1
+    local token = self._animToken
+
+    local activePanel = isMusic and self._ui.musicPanel or self._ui.panel
+    local otherPanel = isMusic and self._ui.panel or self._ui.musicPanel
+    local activeShadow = isMusic and self._ui.musicShadow or self._ui.panelShadow
+    local otherShadow = isMusic and self._ui.panelShadow or self._ui.musicShadow
+    local activeShadowImg = isMusic and self._ui.musicShadowImg or self._ui.panelShadowImg
+    local otherShadowImg = isMusic and self._ui.panelShadowImg or self._ui.musicShadowImg
+    local activeContent = isMusic and self._ui.musicContent or self._ui.panelContent
+    local collapsedFrame = isMusic and self._ui.collapsedMusic or self._ui.collapsedFeedback
+    local otherCollapsed = isMusic and self._ui.collapsedFeedback or self._ui.collapsedMusic
+
+    self:_cancelTweens("panel"); self:_cancelTweens("layout"); self:_cancelTweens("hide")
+    self:_updateWorldBlur(open, instant)
+    if not open then self:_hideAcrylic(); self:_clearBackdropLens(); self._sheetCustomPos = nil; self._draggingSheet = false end
+    if self._ui.panelContent then self._ui.panelContent.Visible = false end
+    if self._ui.musicContent then self._ui.musicContent.Visible = false end
+
+    if open then
+        self:_animatePeekTab(false, true)
+        if otherPanel then
+            otherPanel.Visible = false
+            otherPanel.BackgroundColor3, otherPanel.BackgroundTransparency = self.theme.islandBg, self.theme.islandTransparency
+            self:_applyGlassRadius(otherPanel, UDim.new(1, 0), nil, false)
+        end
+        if otherCollapsed then otherCollapsed.Visible = true end
+        if otherShadow then otherShadow.Visible = false end
+        self:_syncShadowImg(otherShadowImg, false, nil)
+        if collapsedFrame then collapsedFrame.Visible = false end
+        local targetSize, targetPos = self:_getSheetBounds(isMusic)
+        activePanel.Visible, activePanel.ZIndex = true, 12
+        if activeShadow then activeShadow.Visible, activeShadow.ZIndex = true, 10 end
+        if not isMusic then self:_refreshMetaPreview(); self:_setTab(self.state.activeTab, true) else self:_updateMusicViewTabs(true) end
+        local targetTransp = self.theme.panelTransparency
+
+        if instant then
+            activePanel.Size, activePanel.Position = targetSize, targetPos
+            activePanel.BackgroundColor3, activePanel.BackgroundTransparency = self.theme.panelTop, targetTransp
+            self:_applyGlassRadius(activePanel, self.config.glassCornerRadius, nil, true)
+            if activeContent then activeContent.Visible = true end
+            self:_syncShadow(activeShadow, targetPos, targetSize, true)
+            self:_syncShadowImg(activeShadowImg, true, nil)
+            self:_captureBackdropLens(activePanel)
+            self:_updateAcrylic(); self:_updateBackdropLens()
+            return
+        end
+        self:_applyGlassRadius(activePanel, self.config.glassCornerRadius, 0.28, true)
+        self:_syncShadowImg(activeShadowImg, true, 0.28)
+        self:_trackTween("panel", activePanel, 0.30, {Size = targetSize, Position = targetPos, BackgroundColor3 = self.theme.panelTop, BackgroundTransparency = targetTransp}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+        if activeShadow then self:_trackTween("panel", activeShadow, 0.30, {Size = targetSize, Position = targetPos}, Enum.EasingStyle.Back, Enum.EasingDirection.Out) end
+        task.delay(0.11, function()
+            if token == self._animToken and self.state.mounted and self.state.open then
+                if activeContent then activeContent.Visible = true end
+                self:_captureBackdropLens(activePanel)
+            end
+        end)
+    else
+        local layout = self:_collapsedLayout(self.state.activeIsland, false)
+        local target, otherTarget = isMusic and layout.music or layout.feedback, isMusic and layout.feedback or layout.music
+        self:_syncCollapsedContent(self.state.activeIsland)
+        if otherPanel then
+            otherPanel.Size, otherPanel.Position, otherPanel.Visible = otherTarget.size, otherTarget.position, true
+            otherPanel.BackgroundColor3, otherPanel.BackgroundTransparency = self.theme.islandBg, self.theme.islandTransparency
+            self:_applyGlassRadius(otherPanel, UDim.new(1, 0), nil, false)
+        end
+        if otherCollapsed then otherCollapsed.Visible = true end
+        if otherShadow then otherShadow.Visible = false end
+        self:_syncShadowImg(otherShadowImg, false, nil)
+        if activeShadow then activeShadow.Visible = false end
+        if instant then
+            activePanel.Size, activePanel.Position = target.size, target.position
+            activePanel.BackgroundColor3, activePanel.BackgroundTransparency = self.theme.islandBg, self.theme.islandTransparency
+            self:_applyGlassRadius(activePanel, UDim.new(1, 0), nil, false)
+            if collapsedFrame then collapsedFrame.Visible = true end
+            self:_syncShadow(activeShadow, target.position, target.size, false)
+            self:_syncShadowImg(activeShadowImg, false, nil)
+            self:_scheduleAutoHide()
+            return
+        end
+        self:_applyGlassRadius(activePanel, UDim.new(1, 0), 0.24, false)
+        self:_syncShadowImg(activeShadowImg, false, 0.24)
+        self:_trackTween("panel", activePanel, 0.26, {Size = target.size, Position = target.position, BackgroundColor3 = self.theme.islandBg, BackgroundTransparency = self.theme.islandTransparency})
+        task.delay(0.20, function()
+            if token == self._animToken and self.state.mounted and not self.state.open then
+                if collapsedFrame then collapsedFrame.Visible = true end
+                self:_scheduleAutoHide()
+            end
+        end)
+    end
+end
+
+function FeedbackWidget:_togglePanel(open, instant)
+    local want = open
+    if want == nil then want = not (self.state.open and self.state.activeIsland == "feedback") end
+    self:_setSheetOpen("feedback", want, instant)
+end
+
+function FeedbackWidget:_toggleMusicPanel(open, instant)
+    local want = open
+    if want == nil then want = not (self.state.open and self.state.activeIsland == "music") end
+    self:_setSheetOpen("music", want, instant)
+end
+
+function FeedbackWidget:_switchIsland(targetMode)
+    if self.state.open or self.state.activeIsland == targetMode then return end
+    self:_markIslandActivity()
+    self:_applyCollapsedLayout(true, targetMode)
+end
+
+function FeedbackWidget:_submit()
+    if self.state.sending then return end
+    local url = trimString(self.config.webhookUrl)
+    if url == "" or url == "PASTE_DISCORD_WEBHOOK_URL_HERE" then
+        self:_setStatus("Chua cau hinh webhookUrl", "err"); self:_showToast("Thieu webhookUrl trong config", "err"); return
+    end
+    local tab = self.state.activeTab
+    local title, message = trimString(self._ui.titleBox and self._ui.titleBox.Text or ""), trimString(self._ui.messageBox and self._ui.messageBox.Text or "")
+    if message == "" then
+        self:_setStatus("Vui long nhap noi dung gop y", "err"); self:_showToast("Noi dung khong duoc de trong", "err"); return
+    end
+    self.state.fields[tab] = {title = title, message = message}
+    self:_setSendingState(true); self:_setStatus("Dang gui phan hoi...", "info")
+    self._submitToken = (self._submitToken or 0) + 1
+    local submitToken, payload = self._submitToken, self:_buildWebhookPayload(tab, title, message)
+
+    task.spawn(function()
+        local result = WebhookClient.new(url):send(payload)
+        if not self.state.mounted or submitToken ~= self._submitToken then return end
+        self:_setSendingState(false)
+        if result.ok then
+            self.state.fields[tab] = {title = "", message = ""}
+            if self.state.activeTab == tab then
+                if self._ui.titleBox then self._ui.titleBox.Text = "" end
+                if self._ui.messageBox then self._ui.messageBox.Text = "" end
+            end
+            self:_setStatus("Da gui thanh cong! Cam on ban.", "ok"); self:_showToast("Da gui gop y thanh cong", "ok")
+            if self.config.autoCollapseOnSuccess then
+                task.delay(self.config.successCollapseDelay, function()
+                    if submitToken == self._submitToken and self.state.mounted and self.state.open and self.state.activeIsland == "feedback" then self:_togglePanel(false) end
+                end)
+            end
+        else
+            local err = tostring(result.error or "Gui that bai")
+            self:_setStatus("Loi gui: " .. shortenText(err, 72), "err"); self:_showToast("Loi: " .. shortenText(err, 48), "err")
+        end
+    end)
+end
+
+-- Music Engine, Persistence, Search & Playback -------------------------------
+
+function FeedbackWidget:_normalizeMusicItem(track, index)
+    if type(track) == "string" or type(track) == "number" then
+        local sid = normalizeSoundId(track)
+        return sid and {title = "Track " .. tostring(index or 1), artist = "Roblox audio", soundId = sid, cover = self.config.musicIcon} or nil
+    end
+    if type(track) ~= "table" then return nil end
+    local sid = normalizeSoundId(track.soundId or track.assetId or track.id)
+    if not sid then return nil end
+    return {
+        title = tostring(track.title or track.name or ("Track " .. tostring(index or 1))),
+        artist = tostring(track.artist or track.subtitle or track.author or "Dac Cau"),
+        soundId = sid, cover = normalizeSoundId(track.cover or track.coverIcon) or self.config.musicIcon
+    }
+end
+
+function FeedbackWidget:_musicTrackKey(track)
+    if type(track) ~= "table" then return nil end
+    local sid = normalizeSoundId(track.soundId or track.assetId or track.id)
+    return extractAssetId(sid) or sid
+end
+
+function FeedbackWidget:_getMusicTrack(index)
+    local pl = self.music and self.music.playlist or {}
+    if type(pl) ~= "table" or #pl == 0 then return nil end
+    local idx = index or self.music.index
+    return self:_normalizeMusicItem(pl[idx], idx)
+end
+
+function FeedbackWidget:_syncMusicFavoriteMap()
+    self.music.favorites = type(self.music.favorites) == "table" and self.music.favorites or {}
+    self.music.favoriteMap = {}
+    local cleaned = {}
+    for i, item in ipairs(self.music.favorites) do
+        local track = self:_normalizeMusicItem(item, i)
+        local key = self:_musicTrackKey(track)
+        if track and key and not self.music.favoriteMap[key] then self.music.favoriteMap[key] = true; table.insert(cleaned, track) end
+    end
+    self.music.favorites = cleaned
+end
+
+function FeedbackWidget:_loadMusicStorage()
+    if not self.config.persistMusicFavorites then return false end
+    local data, err = readJsonFile(self.config.musicStorageFile)
+    if type(data) ~= "table" then self.music.storageLoaded, self.music.storageError = false, err; return false end
+    local saved = data.musicFavorites or data.favorites or data.savedMusic
+    if type(saved) == "table" then
+        local replaced = {}
+        for _, item in ipairs(saved) do table.insert(replaced, item) end
+        self.music.favorites = replaced
+    end
+    self.music.storageLoaded, self.music.storageError = true, nil
+    self:_syncMusicFavoriteMap()
+    return true
+end
+
+function FeedbackWidget:_saveMusicStorage()
+    if not self.config.persistMusicFavorites then return false, "disabled" end
+    self:_syncMusicFavoriteMap()
+    local ok, err = writeJsonFile(self.config.musicStorageFile, {version = 1, musicFavorites = self.music.favorites or {}})
+    self.music.storageError = err
+    return ok, err
+end
+
+function FeedbackWidget:_isMusicFavorite(track)
+    local key = self:_musicTrackKey(track)
+    return key ~= nil and self.music.favoriteMap and self.music.favoriteMap[key] == true
+end
+
+function FeedbackWidget:_ensureMusicSound()
+    local sound = self.music.sound
+    if sound and sound.Parent then return sound end
+    sound = create("Sound", {Name = "DacCauMusicPlayer", Volume = self.music.muted and 0 or self.music.volume, Looped = false}, SoundService)
+    self.music.sound = sound
+    self:_trackConnection(sound.Ended:Connect(function()
+        if not self.state.mounted or not self.music or not self.music.playing then return end
+        if self.music.repeatOne then self:_loadMusicTrack(self.music.index or 1, true) else self:_nextMusicTrack(true) end
+    end))
+    return sound
+end
+
+function FeedbackWidget:_setMusicUiStatus(text, holdSeconds)
+    self.music.status = text or "San sang"
+    self._musicStatusHoldUntil = (holdSeconds and holdSeconds > 0) and (os.clock() + holdSeconds) or 0
+    if self._ui.musicStatus then self._ui.musicStatus.Text = self.music.status end
+    if self._ui.musicHint then self._ui.musicHint.Text = self.music.status end
+end
+
+function FeedbackWidget:_updateMusicActionButtons()
+    local theme, track = self.theme, self:_getMusicTrack(self.music.index or 1)
+    local fav, rep = self:_isMusicFavorite(track), self.music.repeatOne == true
+    if self._ui.musicFavoriteButton then
+        self._ui.musicFavoriteButton.BackgroundColor3 = fav and Color3.fromRGB(64, 28, 44) or theme.pillBg
+        self._ui.musicFavoriteButton.BackgroundTransparency = fav and 0.16 or theme.pillTransparency
+    end
+    if self._ui.musicFavoriteIcon then self._ui.musicFavoriteIcon.ImageColor3 = fav and theme.heart or theme.textDim end
+    if self._ui.musicRepeatButton then
+        self._ui.musicRepeatButton.BackgroundColor3 = rep and theme.accent or theme.pillBg
+        self._ui.musicRepeatButton.BackgroundTransparency = rep and 0.16 or theme.pillTransparency
+    end
+    if self._ui.musicRepeatIcon then
+        self._ui.musicRepeatIcon.Image = rep and self.config.repeatOneIcon or self.config.repeatIcon
+        self._ui.musicRepeatIcon.ImageColor3 = rep and Color3.fromRGB(255, 255, 255) or theme.textDim
+    end
+    if self._ui.musicPlayCtrl then self._ui.musicPlayCtrl.setPlaying(self.music.playing == true) end
+    if self._ui.musicStatusDot then self._ui.musicStatusDot.BackgroundColor3 = self.music.playing and theme.ok or theme.accent end
+end
+
+function FeedbackWidget:_refreshMusicTrackUi(track, status, holdSeconds)
+    local title, artist = track and track.title or self.config.musicTrackTitle, track and track.artist or self.config.musicTrackSubtitle
+    if self._ui.musicTitle then self._ui.musicTitle.Text = shortenText(title, 15) end
+    if self._ui.musicTrackTitle then self._ui.musicTrackTitle.Text = shortenText(title, 34) end
+    if self._ui.musicTrackSubtitle then self._ui.musicTrackSubtitle.Text = shortenText(artist, 30) end
+    if self._ui.musicCoverIcon then self._ui.musicCoverIcon.Image = track and track.cover or self.config.musicIcon end
+    if self._ui.musicProgressFill then self._ui.musicProgressFill.Size = UDim2.new(0, 0, 1, 0) end
+    if self._ui.musicProgressThumb then self._ui.musicProgressThumb.Position = UDim2.new(0, 0, 0.5, 0) end
+    if self._ui.musicTimeLeft then self._ui.musicTimeLeft.Text = "0:00" end
+    if self._ui.musicTimeRight then self._ui.musicTimeRight.Text = "0:00" end
+    self:_setMusicUiStatus(status or (track and "San sang" or "Chua co playlist"), holdSeconds)
+    self:_updateMusicActionButtons()
+end
+
+function FeedbackWidget:_updateMusicProgress()
+    local sound, fill = self.music and self.music.sound, self._ui.musicProgressFill
+    if not fill then return end
+    local length, pos = sound and tonumber(sound.TimeLength) or 0, sound and tonumber(sound.TimePosition) or 0
+    local ratio = length > 0 and math.clamp(pos / length, 0, 1) or 0
+    fill.Size = UDim2.new(ratio, 0, 1, 0)
+    if self._ui.musicProgressThumb then self._ui.musicProgressThumb.Position = UDim2.new(ratio, 0, 0.5, 0) end
+    if self._ui.musicTimeLeft then self._ui.musicTimeLeft.Text = formatTime(pos) end
+    if self._ui.musicTimeRight then self._ui.musicTimeRight.Text = length > 0 and formatTime(length) or "0:00" end
+    if self.music.playing and os.clock() >= (self._musicStatusHoldUntil or 0) then
+        self:_setMusicUiStatus(length > 0 and (formatTime(pos) .. " / " .. formatTime(length)) or "Dang tai...")
+    end
+end
+
+function FeedbackWidget:_seekMusicAtScreenX(screenX)
+    local bar, sound = self._ui.musicProgressTrack, self.music and self.music.sound
+    if not bar or not sound or bar.AbsoluteSize.X <= 0 then return end
+    local length = tonumber(sound.TimeLength) or 0
+    if length <= 0 then return end
+    local ratio = math.clamp((screenX - bar.AbsolutePosition.X) / bar.AbsoluteSize.X, 0, 1)
+    local newPos = ratio * length
+    pcall(function() sound.TimePosition = newPos end)
+    if self._ui.musicProgressFill then self._ui.musicProgressFill.Size = UDim2.new(ratio, 0, 1, 0) end
+    if self._ui.musicProgressThumb then self._ui.musicProgressThumb.Position = UDim2.new(ratio, 0, 0.5, 0) end
+    if self._ui.musicTimeLeft then self._ui.musicTimeLeft.Text = formatTime(newPos) end
+    self:_setMusicUiStatus(formatTime(newPos) .. " / " .. formatTime(length), 0.9)
+end
+
+function FeedbackWidget:_setMusicVolume(ratio, unmute)
+    local vol = math.clamp(tonumber(ratio) or 0, 0, 1)
+    self.music.volume = vol
+    if unmute ~= false and vol > 0 then self.music.muted = false elseif vol <= 0 then self.music.muted = true end
+    self:_applySoundVolume()
+end
+
+function FeedbackWidget:_toggleMusicMute() self.music.muted = not self.music.muted; self:_applySoundVolume() end
+
+function FeedbackWidget:_applySoundVolume()
+    local eff = self.music.muted and 0 or self.music.volume
+    if self.music.sound then pcall(function() self.music.sound.Volume = eff end) end
+    if self._ui.volumeFill then self._ui.volumeFill.Size = UDim2.new(eff, 0, 1, 0) end
+    if self._ui.volumeText then self._ui.volumeText.Text = string.format("%d%%", math.floor(eff * 100 + 0.5)) end
+    if self._ui.volumeIconCtrl then self._ui.volumeIconCtrl.setMuted(self.music.muted or eff <= 0.001) end
+end
+
+function FeedbackWidget:_watchAudioPlayback(sound, loadToken)
+    task.spawn(function()
+        local deadline = os.clock() + 4.5
+        while os.clock() < deadline do
+            if loadToken ~= self._musicLoadToken or not self.state.mounted or not self.music.playing then return end
+            local ok, loaded, length = pcall(function() return sound.IsLoaded, tonumber(sound.TimeLength) or 0 end)
+            if ok and (loaded or length > 0) then return end
+            task.wait(0.25)
+        end
+        if loadToken ~= self._musicLoadToken or not self.state.mounted or not self.music.playing then return end
+        local ok, loaded, length = pcall(function() return sound.IsLoaded, tonumber(sound.TimeLength) or 0 end)
+        if not ok or (not loaded and length <= 0) then
+            self.music.playing, self.music.paused = false, false
+            pcall(function() sound:Stop() end)
+            self:_setMusicUiStatus("Audio loi hoac bi khoa", 2.5); self:_updateMusicActionButtons()
+        end
+    end)
+end
+
+function FeedbackWidget:_loadMusicTrack(index, autoplay)
+    self._musicLoadToken = (self._musicLoadToken or 0) + 1
+    local loadToken, playlist = self._musicLoadToken, self.music.playlist or {}
+    if type(playlist) ~= "table" or #playlist == 0 then
+        self.music.playing, self.music.paused, self.music.loadedSoundId = false, false, nil
+        self:_refreshMusicTrackUi(nil, "Chua co playlist"); return false
+    end
+    index = tonumber(index) or 1
+    if index < 1 then index = #playlist elseif index > #playlist then index = 1 end
+    local track = self:_getMusicTrack(index)
+    if not track or not track.soundId then
+        self.music.playing, self.music.paused = false, false; self:_refreshMusicTrackUi(track, "Track loi SoundId"); return false
+    end
+    local sound = self:_ensureMusicSound()
+    self.music.index, self.music.loadedSoundId, self.music.playing, self.music.paused = index, track.soundId, false, false
+    pcall(function() sound:Stop(); sound.SoundId = track.soundId; sound.TimePosition = 0; sound.Volume = self.music.muted and 0 or self.music.volume end)
+    self:_refreshMusicTrackUi(track, autoplay and "Dang tai..." or "San sang")
+    if autoplay then
+        local ok = pcall(function() sound:Play() end)
+        self.music.playing = ok
+        self:_setMusicUiStatus(ok and "Dang phat" or "Khong phat duoc"); self:_updateMusicActionButtons()
+        if ok then self:_watchAudioPlayback(sound, loadToken) end
+        return ok
+    end
+    return true
+end
+
+function FeedbackWidget:_playMusic()
+    local track = self:_getMusicTrack(self.music.index or 1)
+    if not track then self:_refreshMusicTrackUi(nil, "Them musicPlaylist truoc") return end
+    if self.music.loadedSoundId ~= track.soundId then self:_loadMusicTrack(self.music.index or 1, true) return end
+    local sound, wasPaused = self:_ensureMusicSound(), self.music.paused == true
+    local ok = pcall(function() if wasPaused then sound:Resume() else sound:Play() end end)
+    if not ok and wasPaused then ok = pcall(function() sound:Play() end) end
+    self.music.playing, self.music.paused = ok, false
+    self._musicLoadToken = (self._musicLoadToken or 0) + 1
+    self:_setMusicUiStatus(ok and "Dang phat" or "Khong phat duoc"); self:_updateMusicActionButtons()
+    if ok then self:_watchAudioPlayback(sound, self._musicLoadToken) end
+end
+
+function FeedbackWidget:_pauseMusic()
+    if self.music.sound then pcall(function() self.music.sound:Pause() end) end
+    self.music.playing, self.music.paused = false, true
+    self._musicLoadToken = (self._musicLoadToken or 0) + 1
+    self:_setMusicUiStatus("Tam dung", 1.5); self:_updateMusicProgress(); self:_updateMusicActionButtons()
+end
+
+function FeedbackWidget:_toggleMusicPlayback() if self.music.playing then self:_pauseMusic() else self:_playMusic() end end
+function FeedbackWidget:_nextMusicTrack(force) if #(self.music.playlist or {}) == 0 then self:_refreshMusicTrackUi(nil, "Chua co playlist") return end; self:_loadMusicTrack((self.music.index or 1) + 1, force == true or self.music.playing) end
+function FeedbackWidget:_prevMusicTrack() if #(self.music.playlist or {}) == 0 then self:_refreshMusicTrackUi(nil, "Chua co playlist") return end; self:_loadMusicTrack((self.music.index or 1) - 1, self.music.playing) end
+
+function FeedbackWidget:_copyCurrentMusicAssetId()
+    local track = self:_getMusicTrack(self.music.index or 1)
+    if not track or not track.soundId then self:_setMusicUiStatus("Chua co assetId", 2) return end
+    local id = extractAssetId(track.soundId)
+    local val = id and ("rbxassetid://" .. id) or tostring(track.soundId)
+    if copyToClipboard(val) then self:_setMusicUiStatus("Da copy " .. val, 2); self:_showToast("Da copy " .. val, "ok")
+    else self:_setMusicUiStatus("Clipboard khong ho tro", 2) end
+end
+
+function FeedbackWidget:_toggleMusicRepeat()
+    self.music.repeatOne = not self.music.repeatOne
+    self:_setMusicUiStatus(self.music.repeatOne and "Lap lai 1 bai: bat" or "Lap lai 1 bai: tat", 2)
+    self:_updateMusicActionButtons()
+end
+
+function FeedbackWidget:_toggleCurrentMusicFavorite()
+    self:_syncMusicFavoriteMap()
+    local track = self:_getMusicTrack(self.music.index or 1)
+    local key = self:_musicTrackKey(track)
+    if not track or not key then self:_setMusicUiStatus("Chua co bai de luu", 2) return end
+
+    local removed = false
+    if self.music.favoriteMap[key] then
+        removed = true
+        for i = #self.music.favorites, 1, -1 do if self:_musicTrackKey(self.music.favorites[i]) == key then table.remove(self.music.favorites, i) end end
+        self.music.favoriteMap[key] = nil
+        self:_setMusicUiStatus(self:_saveMusicStorage() and "Da bo tim + luu file" or "Da bo tim runtime", 2)
+    else
+        table.insert(self.music.favorites, track); self.music.favoriteMap[key] = true
+        self:_setMusicUiStatus(self:_saveMusicStorage() and ("Da luu vao " .. tostring(self.config.musicStorageFile)) or "Da luu runtime", 2)
+    end
+
+    if removed and self.music.queueSource == "favorites" then
+        local newQ = {}
+        for i, item in ipairs(self.music.favorites) do local t = self:_normalizeMusicItem(item, i); if t then table.insert(newQ, t) end end
+        self.music.playlist = newQ
+        if #newQ == 0 then
+            self.music.index, self.music.playing, self.music.paused, self.music.loadedSoundId = 1, false, false, nil
+            if self.music.sound then pcall(function() self.music.sound:Stop() end) end
+            self:_refreshMusicTrackUi(nil, "Danh sach Saved trong", 2)
+        else self.music.index = math.clamp(self.music.index or 1, 1, #newQ) end
+    end
+    self:_updateMusicActionButtons(); self:_updateMusicViewTabs(true)
+    if self.music.viewMode == "favorites" or self.music.viewMode == "playlist" then self:_renderMusicCollection(self.music.viewMode, nil, true) end
+end
+
+function FeedbackWidget:SetMusicPlaylist(playlist, startIndex)
+    self.music = self.music or {}
+    local copied = {}
+    if type(playlist) == "table" then for _, item in ipairs(playlist) do table.insert(copied, item) end end
+    self.music.masterPlaylist, self.music.playlist = copied, copied
+    self.music.index, self.music.loadedSoundId, self.music.playing, self.music.paused, self.music.queueSource = tonumber(startIndex) or 1, nil, false, false, "playlist"
+    if self.music.sound then pcall(function() self.music.sound:Stop(); self.music.sound.SoundId = "" end) end
+    self:_loadMusicTrack(self.music.index, false); self:_updateMusicViewTabs(true)
+    if self.music.viewMode == "playlist" then self:_renderMusicCollection("playlist", nil, true) end
+end
+
+function FeedbackWidget:_createMusicResultRow(index)
+    local theme = self.theme
+    local row = create("TextButton", {Name = "TrackRow_" .. tostring(index), BackgroundColor3 = theme.cardBg, BackgroundTransparency = theme.cardTransparency, Size = UDim2.new(1, 0, 0, 44), AutoButtonColor = false, Text = "", Visible = false, ZIndex = 15}, self._ui.musicResultsScroll)
+    addCorner(row, 14)
+    local rowStroke = addStroke(row, theme.rim, 0.78, 1)
+    local idxLbl = makeLabel(row, tostring(index), FONT_MONO, 11, theme.textMuted, UDim2.fromOffset(10, 0), UDim2.new(0, 22, 1, 0), 16, Enum.TextXAlignment.Center)
+    local titleLbl = makeLabel(row, "", FONT_MEDIUM, 12, theme.text, UDim2.fromOffset(36, 5), UDim2.new(1, -68, 0, 18), 16)
+    local artistLbl = makeLabel(row, "", FONT_BODY, 11, theme.textMuted, UDim2.fromOffset(36, 23), UDim2.new(1, -68, 0, 15), 16)
+    local favBadge = create("ImageLabel", {BackgroundTransparency = 1, AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -12, 0.5, 0), Size = UDim2.fromOffset(14, 14), Image = self.config.favoriteIcon, ImageColor3 = theme.heart, Visible = false, ZIndex = 16}, row)
+
+    self:_trackConnection(row.MouseEnter:Connect(function() row.BackgroundColor3, row.BackgroundTransparency, rowStroke.Transparency = theme.cardHover, theme.cardHoverTransparency, 0.56 end))
+    self:_trackConnection(row.MouseLeave:Connect(function() row.BackgroundColor3, row.BackgroundTransparency, rowStroke.Transparency = theme.cardBg, theme.cardTransparency, 0.78 end))
+    self:_trackConnection(row.MouseButton1Click:Connect(function() self:_selectMusicResult(index) end))
+    return {button = row, index = idxLbl, title = titleLbl, artist = artistLbl, fav = favBadge}
+end
+
+function FeedbackWidget:_renderMusicList(results)
+    if not self._ui.musicResultsScroll then return end
+    results = type(results) == "table" and results or {}
+    self.music.searchResults, self._ui.musicResultRows = results, self._ui.musicResultRows or {}
+    local rows = self._ui.musicResultRows
+    for i = 1, #results do
+        if not rows[i] then rows[i] = self:_createMusicResultRow(i) end
+        local row, item = rows[i], self:_normalizeMusicItem(results[i], i)
+        if item then
+            row.index.Text, row.title.Text, row.artist.Text = string.format("%02d", i), shortenText(item.title, 34), shortenText(item.artist, 30)
+            row.fav.Visible, row.button.Visible = self:_isMusicFavorite(item), true
+        else row.button.Visible = false end
+    end
+    for i = #results + 1, #rows do rows[i].button.Visible = false end
+    self._ui.musicResultsScroll.CanvasSize = UDim2.fromOffset(0, math.max(0, #results * 44 + math.max(0, #results - 1) * 6))
+    self._ui.musicResultsScroll.CanvasPosition = Vector2.new(0, 0)
+end
+
+function FeedbackWidget:_updateMusicViewTabs(instant)
+    local mode = self.music.viewMode or "playlist"
+    local labels = {playlist = string.format("Playlist (%d)", #(self.music.masterPlaylist or {})), favorites = string.format("Saved (%d)", #(self.music.favorites or {})), search = "Search"}
+    local activeIdx = 1
+    for i, tab in ipairs(MUSIC_TABS) do
+        local btn, selected = self._ui.musicViewButtons and self._ui.musicViewButtons[tab.key], tab.key == mode
+        if selected then activeIdx = i end
+        if btn then btn.Text = labels[tab.key]; btn.TextColor3 = selected and self.theme.text or self.theme.textDim; btn.Font = selected and FONT_BOLD or FONT_MEDIUM end
+    end
+    self:_positionSegmentIndicator(self._ui.musicTabIndicator, MUSIC_TABS, activeIdx, not instant)
+    if self._ui.musicSearchRow then self._ui.musicSearchRow.Visible = mode == "search" end
+    if self._ui.musicResultsScroll then
+        self._ui.musicResultsScroll.Position = UDim2.fromOffset(0, mode == "search" and 76 or 38)
+        self._ui.musicResultsScroll.Size = UDim2.new(1, 0, 1, mode == "search" and -76 or -38)
+    end
+end
+
+function FeedbackWidget:_renderMusicCollection(mode, statusText, keepToken)
+    if not keepToken then self._musicSearchToken = (self._musicSearchToken or 0) + 1 end
+    self.music.viewMode = mode
+    if mode == "favorites" then self:_syncMusicFavoriteMap() end
+    self:_updateMusicViewTabs()
+    local src = mode == "favorites" and (self.music.favorites or {}) or (self.music.masterPlaylist or {})
+    local list = {}
+    for i, item in ipairs(src) do local t = self:_normalizeMusicItem(item, i); if t then table.insert(list, t) end end
+    self:_renderMusicList(list)
+    local fallback = mode == "favorites" and (#list > 0 and ("Saved: " .. #list .. " bai") or "Chua co bai da luu") or (#list > 0 and ("Playlist: " .. #list .. " bai") or "Playlist trong")
+    self:_setMusicUiStatus(statusText or fallback, statusText and 2 or 0)
+end
+
+function FeedbackWidget:_openMusicSearchTab()
+    self.music.viewMode = "search"
+    self:_updateMusicViewTabs()
+    local q = trimString(self._ui.musicSearchBox and self._ui.musicSearchBox.Text or "")
+    if q == "" then self:_renderMusicList({}); self:_setMusicUiStatus("Nhap ten bai hat hoac ID") else self:_runMusicSearch(q) end
+end
+
+function FeedbackWidget:_selectMusicResult(index)
+    local chosen = self:_normalizeMusicItem((self.music.searchResults or {})[index], index)
+    if not chosen or not chosen.soundId then return end
+    if self.music.viewMode == "playlist" or self.music.viewMode == "favorites" then
+        local src, queue = self.music.viewMode == "favorites" and (self.music.favorites or {}) or (self.music.masterPlaylist or {}), {}
+        for i, item in ipairs(src) do local t = self:_normalizeMusicItem(item, i); if t then table.insert(queue, t) end end
+        self.music.playlist, self.music.queueSource = queue, self.music.viewMode
+        self:_loadMusicTrack(index, true)
+    else
+        local queue = self.music.playlist or {}
+        if self.music.queueSource ~= "playlist" then
+            queue = {}
+            for i, item in ipairs(self.music.masterPlaylist or {}) do local t = self:_normalizeMusicItem(item, i); if t then table.insert(queue, t) end end
+            self.music.playlist, self.music.queueSource = queue, "playlist"
+        end
+        local key, targetIdx = self:_musicTrackKey(chosen), nil
+        for i, item in ipairs(queue) do if self:_musicTrackKey(item) == key then targetIdx = i break end end
+        if not targetIdx then table.insert(queue, chosen); targetIdx = #queue end
+        self:_loadMusicTrack(targetIdx, true)
+    end
+end
+
+function FeedbackWidget:_parseMusicSearchResults(data)
+    local results, seen = {}, {}
+    local function push(item)
+        if type(item) ~= "table" or #results >= self.config.musicSearchLimit then return end
+        local asset = item.asset or item.Asset or item
+        local id = extractAssetId(asset.id or asset.assetId or asset.AssetId or item.id or item.assetId or item.AssetId)
+        if not id or seen[id] then return end
+        seen[id] = true
+        local creator = item.creator or asset.creator or item.Creator or asset.Creator
+        local creatorName = type(creator) == "table" and (creator.name or creator.displayName or creator.Name or creator.DisplayName or "Creator Store") or (creator ~= nil and tostring(creator) or "Creator Store")
+        local title = asset.name or asset.displayName or asset.title or item.name or item.displayName or item.title or ("Audio " .. id)
+        table.insert(results, {title = tostring(title), artist = tostring(creatorName), soundId = "rbxassetid://" .. id, cover = self.config.musicIcon})
+    end
+    if type(data) == "table" then
+        for _, key in ipairs({"data", "assets", "results", "creatorStoreAssets", "creatorStoreProducts", "items", "records"}) do
+            if type(data[key]) == "table" then for _, item in ipairs(data[key]) do push(item) end end
+        end
+        if #results == 0 then
+            for _, bucket in pairs(data) do
+                if type(bucket) == "table" then for _, item in ipairs(bucket) do push(item) end; if #results > 0 then break end end
+            end
+        end
+    end
+    return results
+end
+
+function FeedbackWidget:_runMusicSearch(query, token)
+    query = trimString(query)
+    if token == nil then self._musicSearchToken = (self._musicSearchToken or 0) + 1; token = self._musicSearchToken end
+    if query == "" then self:_renderMusicList({}); self:_setMusicUiStatus("Nhap ten hoac ID audio"); return end
+    local directId = (query:match("^rbxassetid://%d+$") or query:match("^%d+$")) and extractAssetId(query) or nil
+    if directId then
+        self:_renderMusicList({{title = "Audio " .. directId, artist = "Direct asset", soundId = "rbxassetid://" .. directId, cover = self.config.musicIcon}})
+        self:_setMusicUiStatus("Tim thay ID truc tiep"); return
+    end
+    if #query < 2 then self:_renderMusicList({}); self:_setMusicUiStatus("Nhap it nhat 2 ky tu hoac ID"); return end
+    local cacheKey = query:lower()
+    if self._musicSearchCache[cacheKey] then
+        local cached = self._musicSearchCache[cacheKey]
+        self:_renderMusicList(cached); self:_setMusicUiStatus(#cached > 0 and "Chon ket qua de phat" or "Khong co ket qua"); return
+    end
+    local req = getRequestFn()
+    if not req then self:_renderMusicList({}); self:_setMusicUiStatus("Executor khong ho tro request"); return end
+    self:_renderMusicList({}); self:_setMusicUiStatus("Dang tim tren Roblox...")
+
+    task.spawn(function()
+        local url = self.config.musicSearchEndpoint .. "?searchCategoryType=Audio&query=" .. urlEncode(query) .. "&maxPageSize=" .. tostring(self.config.musicSearchLimit) .. "&sortCategory=Relevance&searchView=Full"
+        local ok, res = pcall(req, {Url = url, Method = "GET", Headers = {["Accept"] = "application/json"}})
+        if token ~= self._musicSearchToken or not self.state.mounted or self.music.viewMode ~= "search" then return end
+        if not ok or type(res) ~= "table" then self:_setMusicUiStatus("Loi request search"); return end
+        local status = tonumber(res.StatusCode or res.Status or res.statusCode or res.status or 0) or 0
+        local success = res.Success; if success == nil then success = res.success end; if success == nil then success = (status >= 200 and status < 300) end
+        if status == 429 then self:_setMusicUiStatus("Qua nhieu yeu cau (429)"); return end
+        if success ~= true then self:_setMusicUiStatus("Search loi " .. tostring(status)); return end
+        local decOk, decoded = pcall(function() return HttpService:JSONDecode(tostring(res.Body or res.body or "")) end)
+        if token ~= self._musicSearchToken or not self.state.mounted or self.music.viewMode ~= "search" then return end
+        if not decOk or type(decoded) ~= "table" then self:_setMusicUiStatus("Khong doc duoc ket qua"); return end
+        local results = self:_parseMusicSearchResults(decoded)
+        self._musicSearchCache[cacheKey] = results
+        self:_renderMusicList(results); self:_setMusicUiStatus(#results > 0 and "Chon ket qua de phat" or "Khong co ket qua")
+    end)
+end
+
+function FeedbackWidget:_queueMusicSearch(query)
+    self._musicSearchToken = (self._musicSearchToken or 0) + 1
+    local token, trimmed = self._musicSearchToken, trimString(query)
+    if trimmed == "" then if self.music.viewMode == "search" then self:_renderMusicList({}); self:_setMusicUiStatus("Nhap ten hoac ID audio") end; return end
+    if not trimmed:match("^rbxassetid://%d+$") and not trimmed:match("^%d+$") and #trimmed < 2 then self:_renderMusicList({}); self:_setMusicUiStatus("Nhap it nhat 2 ky tu hoac ID"); return end
+    task.delay(self.config.musicSearchDebounce, function()
+        if token == self._musicSearchToken and self.state.mounted and self.music.viewMode == "search" then self:_runMusicSearch(trimmed, token) end
+    end)
+end
+
+-- UI Tree Builders & Mount ---------------------------------------------------
+
+function FeedbackWidget:_buildSegmentedControl(parent, items, activeIndex, pos, size, z, onSelect)
+    local theme = self.theme
+    local track = create("Frame", {BackgroundColor3 = theme.segmentBg, BackgroundTransparency = theme.segmentTransparency, Position = pos, Size = size, ZIndex = z}, parent)
+    addCorner(track, UDim.new(1, 0)); addSpecularRim(track, 1.1, 0.24, 0.84, 0.42)
+    local indicator = create("Frame", {BackgroundColor3 = theme.segmentIndicator, BackgroundTransparency = theme.segmentIndicatorTransp, ZIndex = z + 1}, track)
+    addCorner(indicator, UDim.new(1, 0)); addSpecularRim(indicator, 1.1, 0.14, 0.72, 0.28)
+
+    local buttons, count = {}, #items
+    for i, item in ipairs(items) do
+        local key, label = type(item) == "table" and item.key or item, type(item) == "table" and item.label or item
+        local btn = create("TextButton", {
+            BackgroundTransparency = 1, Position = UDim2.new((i - 1) / count, 0, 0, 0), Size = UDim2.new(1 / count, 0, 1, 0),
+            Font = i == activeIndex and FONT_BOLD or FONT_MEDIUM, TextSize = 11,
+            TextColor3 = i == activeIndex and theme.text or theme.textDim, Text = label, AutoButtonColor = false, ZIndex = z + 2
+        }, track)
+        buttons[key] = btn
+        self:_trackConnection(btn.MouseButton1Click:Connect(function() onSelect(key) end))
+    end
+    self:_positionSegmentIndicator(indicator, items, activeIndex, false)
+    return track, indicator, buttons
+end
+
+function FeedbackWidget:_bindSheetDrag(dragZone, panel, shadow)
+    self:_trackConnection(dragZone.InputBegan:Connect(function(input)
+        if not self.state.open then return end
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            self._draggingSheet = true
+            self._dragStartInput = Vector2.new(input.Position.X, input.Position.Y)
+            local insetY = self._ignoreGuiInset and self:_getSafeTopBase() or 0
+            self._dragStartPos = Vector2.new(panel.AbsolutePosition.X + panel.AbsoluteSize.X * 0.5, panel.AbsolutePosition.Y + insetY)
+            self._dragPanel, self._dragShadow = panel, shadow
+            local rig = self._lensRigs and self._lensRigs[panel]
+            if not rig or #(rig.entries or {}) == 0 then self:_captureBackdropLens(panel) end
+        end
+    end))
+end
+
+function FeedbackWidget:_buildFeedbackBody(panel, theme)
+    local content = create("Frame", {Name = "FeedbackContent", BackgroundTransparency = 1, Active = true, Size = UDim2.fromScale(1, 1), Visible = false, ZIndex = 16}, panel)
+    addPadding(content, 14, 14, 14, 14)
+
+    local header = create("Frame", {BackgroundTransparency = 1, Active = true, Size = UDim2.new(1, 0, 0, 42), ZIndex = 16}, content)
+    self:_bindSheetDrag(content, panel, self._ui.panelShadow)
+    self:_bindSheetDrag(header, panel, self._ui.panelShadow)
+    local iconBadge = create("Frame", {BackgroundColor3 = theme.accent, BackgroundTransparency = 0.16, Position = UDim2.fromOffset(0, 3), Size = UDim2.fromOffset(34, 34), ZIndex = 15}, header)
+    addCorner(iconBadge, UDim.new(1, 0)); addStroke(iconBadge, theme.rim, 0.55, 1)
+    create("ImageLabel", {BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(17, 17), Image = self.config.feedbackIcon, ImageColor3 = Color3.fromRGB(255, 255, 255), ZIndex = 16}, iconBadge)
+    makeLabel(header, self.config.title, FONT_BOLD, 16, theme.text, UDim2.fromOffset(44, 1), UDim2.new(1, -84, 0, 22), 15)
+    makeLabel(header, self.config.subtitle, FONT_BODY, 11, theme.textMuted, UDim2.fromOffset(44, 22), UDim2.new(1, -84, 0, 16), 15)
+
+    local closeBtn = makePillBtn(header, theme.pillBg, theme.pillTransparency, Vector2.new(1, 0.5), UDim2.new(1, 0, 0.5, 0), UDim2.fromOffset(30, 30), 16, theme.rim, 0.72)
+    makeCloseIcon(closeBtn, theme.text, 17)
+    self:_trackConnection(closeBtn.MouseButton1Click:Connect(function() self:_togglePanel(false) end))
+
+    local segItems = {}
+    for _, key in ipairs(TAB_ORDER) do table.insert(segItems, {key = key, label = key == "de_xuat_game" and "Gop y" or (key == "bao_loi_script" and "Bao loi" or "Khac")}) end
+    local _, tabIndicator, tabButtons = self:_buildSegmentedControl(content, segItems, 1, UDim2.fromOffset(0, 48), UDim2.new(1, 0, 0, 32), 15, function(key) self:_setTab(key) end)
+
+    local scroll = create("ScrollingFrame", {
+        BackgroundTransparency = 1, BorderSizePixel = 0, Position = UDim2.fromOffset(0, 88), Size = UDim2.new(1, 0, 1, -152),
+        CanvasSize = UDim2.fromOffset(0, 0), AutomaticCanvasSize = Enum.AutomaticSize.Y, ScrollBarThickness = 3,
+        ScrollBarImageColor3 = theme.textMuted, ScrollBarImageTransparency = 0.45, ZIndex = 15
+    }, content)
+    create("UIListLayout", {SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 10)}, scroll)
+
+    local metaCard = create("Frame", {LayoutOrder = 1, BackgroundColor3 = theme.cardBg, BackgroundTransparency = theme.cardTransparency, Size = UDim2.new(1, 0, 0, 56), ZIndex = 15}, scroll)
+    addCorner(metaCard, 18); addSpecularRim(metaCard, 1.1, 0.16, 0.84, 0.34); addPadding(metaCard, 8, 10, 8, 10)
+    local metaChips = {}
+    for _, m in ipairs({{key = "user", label = "User", x = 0, y = 0}, {key = "world", label = "World", x = 0.5, y = 0}, {key = "level", label = "Level", x = 0, y = 0.5}, {key = "executor", label = "Exec", x = 0.5, y = 0.5}}) do
+        local cell = create("Frame", {BackgroundTransparency = 1, Position = UDim2.fromScale(m.x, m.y), Size = UDim2.fromScale(0.5, 0.5), ZIndex = 16}, metaCard)
+        makeLabel(cell, m.label .. ":", FONT_MEDIUM, 10, theme.textMuted, UDim2.new(), UDim2.fromOffset(38, 18), 16)
+        metaChips[m.key] = makeLabel(cell, "...", FONT_MONO, 10, theme.text, UDim2.fromOffset(38, 0), UDim2.new(1, -42, 0, 18), 16)
+    end
+
+    local titleCard = create("Frame", {LayoutOrder = 2, BackgroundColor3 = theme.inputBg, BackgroundTransparency = theme.inputTransparency, Size = UDim2.new(1, 0, 0, 40), ZIndex = 15}, scroll)
+    addCorner(titleCard, 14)
+    local titleStroke = addStroke(titleCard, theme.rim, 0.82, 1)
+    local titleBox = create("TextBox", {BackgroundTransparency = 1, ClipsDescendants = true, Position = UDim2.fromOffset(12, 0), Size = UDim2.new(1, -24, 1, 0), Font = FONT_MEDIUM, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left, TextColor3 = theme.text, PlaceholderColor3 = theme.textMuted, PlaceholderText = TAB_CONFIG.de_xuat_game.hintTitle, Text = "", ClearTextOnFocus = false, ZIndex = 16}, titleCard)
+
+    local msgCard = create("Frame", {LayoutOrder = 3, BackgroundColor3 = theme.inputBg, BackgroundTransparency = theme.inputTransparency, Size = UDim2.new(1, 0, 0, 146), ZIndex = 15}, scroll)
+    addCorner(msgCard, 18)
+    local msgStroke = addStroke(msgCard, theme.rim, 0.82, 1)
+    local messageBox = create("TextBox", {BackgroundTransparency = 1, ClipsDescendants = true, Position = UDim2.fromOffset(12, 10), Size = UDim2.new(1, -24, 1, -20), Font = FONT_BODY, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, TextColor3 = theme.text, PlaceholderColor3 = theme.textMuted, PlaceholderText = TAB_CONFIG.de_xuat_game.hintBody, Text = "", MultiLine = true, TextWrapped = true, ClearTextOnFocus = false, ZIndex = 16}, msgCard)
+
+    for _, pair in ipairs({{titleBox, titleStroke, "title"}, {messageBox, msgStroke, "message"}}) do
+        self:_trackConnection(pair[1].Focused:Connect(function() pair[2].Color, pair[2].Transparency = theme.accent, 0.25 end))
+        self:_trackConnection(pair[1].FocusLost:Connect(function() pair[2].Color, pair[2].Transparency = theme.rim, 0.82 end))
+        self:_trackConnection(pair[1]:GetPropertyChangedSignal("Text"):Connect(function() if self.state.fields[self.state.activeTab] then self.state.fields[self.state.activeTab][pair[3]] = pair[1].Text end end))
+    end
+
+    local statusLabel = makeLabel(content, "San sang gui phan hoi", FONT_BODY, 11, theme.textMuted, UDim2.new(0, 2, 1, -56), UDim2.new(1, -4, 0, 16), 15)
+    local submitButton = makePillBtn(content, theme.accent, 0.14, nil, UDim2.new(0, 0, 1, -36), UDim2.new(1, 0, 0, 36), 16)
+    addSpecularRim(submitButton, 1.25, 0.10, 0.74, 0.24)
+    submitButton.Font, submitButton.TextSize, submitButton.TextColor3, submitButton.Text = FONT_BOLD, 13, Color3.fromRGB(255, 255, 255), "Gui phan hoi"
+    self:_trackConnection(submitButton.MouseButton1Click:Connect(function() self:_submit() end))
+
+    self._ui.panelContent, self._ui.tabButtons, self._ui.feedbackTabIndicator = content, tabButtons, tabIndicator
+    self._ui.metaChips, self._ui.titleBox, self._ui.messageBox, self._ui.statusLabel, self._ui.submitButton = metaChips, titleBox, messageBox, statusLabel, submitButton
+end
+
+function FeedbackWidget:_buildMusicBody(panel, theme)
+    local content = create("Frame", {Name = "MusicContent", BackgroundTransparency = 1, Active = true, Size = UDim2.fromScale(1, 1), Visible = false, ZIndex = 16}, panel)
+    addPadding(content, 14, 14, 14, 14)
+
+    local header = create("Frame", {BackgroundTransparency = 1, Active = true, Size = UDim2.new(1, 0, 0, 34), ZIndex = 16}, content)
+    self:_bindSheetDrag(content, panel, self._ui.musicShadow)
+    self:_bindSheetDrag(header, panel, self._ui.musicShadow)
+    create("ImageLabel", {BackgroundTransparency = 1, Position = UDim2.fromOffset(2, 8), Size = UDim2.fromOffset(18, 18), Image = self.config.musicIcon, ImageColor3 = theme.accent, ZIndex = 15}, header)
+    makeLabel(header, self.config.musicLabel, FONT_BOLD, 15, theme.text, UDim2.fromOffset(26, 5), UDim2.new(1, -120, 0, 22), 15)
+
+    local copyBtn = makePillBtn(header, theme.pillBg, theme.pillTransparency, Vector2.new(1, 0.5), UDim2.new(1, -36, 0.5, 0), UDim2.fromOffset(58, 26), 16, theme.rim, 0.78)
+    copyBtn.Font, copyBtn.TextSize, copyBtn.TextColor3, copyBtn.Text = FONT_MONO, 10, theme.textDim, "Copy ID"
+    self:_trackConnection(copyBtn.MouseButton1Click:Connect(function() self:_copyCurrentMusicAssetId() end))
+
+    local closeBtn = makePillBtn(header, theme.pillBg, theme.pillTransparency, Vector2.new(1, 0.5), UDim2.new(1, 0, 0.5, 0), UDim2.fromOffset(28, 28), 16, theme.rim, 0.72)
+    makeCloseIcon(closeBtn, theme.text, 17)
+    self:_trackConnection(closeBtn.MouseButton1Click:Connect(function() self:_toggleMusicPanel(false) end))
+
+    local card = create("Frame", {BackgroundColor3 = theme.cardBg, BackgroundTransparency = 0.92, Position = UDim2.fromOffset(0, 40), Size = UDim2.new(1, 0, 0, 146), ZIndex = 15}, content)
+    addCorner(card, 18); addSpecularRim(card, 1.0, 0.34, 0.90, 0.48); addPadding(card, 12, 12, 10, 12)
+
+    local artBox = create("Frame", {BackgroundColor3 = theme.accent, BackgroundTransparency = 0.24, Size = UDim2.fromOffset(44, 44), ZIndex = 16}, card)
+    addCorner(artBox, 12); addStroke(artBox, theme.rim, 0.48, 1)
+    local coverIcon = create("ImageLabel", {BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(22, 22), Image = self.config.musicIcon, ImageColor3 = Color3.fromRGB(255, 255, 255), ZIndex = 17}, artBox)
+    local trackTitle = makeLabel(card, self.config.musicTrackTitle, FONT_BOLD, 14, theme.text, UDim2.fromOffset(54, 1), UDim2.new(1, -122, 0, 20), 16)
+    local trackSub = makeLabel(card, self.config.musicTrackSubtitle, FONT_BODY, 11, theme.textDim, UDim2.fromOffset(54, 21), UDim2.new(1, -122, 0, 16), 16)
+
+    local favBtn = makePillBtn(card, theme.pillBg, 0.88, Vector2.new(1, 0), UDim2.new(1, -34, 0, 6), UDim2.fromOffset(28, 28), 16)
+    local favIcon = create("ImageLabel", {BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(14, 14), Image = self.config.favoriteIcon, ImageColor3 = theme.text, ZIndex = 17}, favBtn)
+    self:_trackConnection(favBtn.MouseButton1Click:Connect(function() self:_toggleCurrentMusicFavorite() end))
+
+    local repeatBtn = makePillBtn(card, theme.pillBg, 0.88, Vector2.new(1, 0), UDim2.new(1, 0, 0, 6), UDim2.fromOffset(28, 28), 16)
+    local repeatIcon = create("ImageLabel", {BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(14, 14), Image = self.config.repeatIcon, ImageColor3 = theme.text, ZIndex = 17}, repeatBtn)
+    self:_trackConnection(repeatBtn.MouseButton1Click:Connect(function() self:_toggleMusicRepeat() end))
+
+    local progressTrack = makePillBtn(card, Color3.fromRGB(255, 255, 255), 0.70, nil, UDim2.fromOffset(0, 56), UDim2.new(1, 0, 0, 6), 16)
+    local progressFill = create("Frame", {BackgroundColor3 = Color3.fromRGB(255, 255, 255), BackgroundTransparency = 0.06, BorderSizePixel = 0, Size = UDim2.new(0, 0, 1, 0), ZIndex = 17}, progressTrack)
+    addCorner(progressFill, UDim.new(1, 0))
+    local progressThumb = create("Frame", {BackgroundColor3 = Color3.fromRGB(255, 255, 255), BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0, 0, 0.5, 0), Size = UDim2.fromOffset(11, 11), ZIndex = 18}, progressTrack)
+    addCorner(progressThumb, UDim.new(1, 0))
+    self:_trackConnection(progressTrack.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            self._seekingProgress = true; self:_seekMusicAtScreenX(input.Position.X)
+        end
+    end))
+
+    local timeLeft = makeLabel(card, "0:00", FONT_MONO, 10, theme.textDim, UDim2.fromOffset(0, 67), UDim2.fromOffset(48, 14), 16)
+    local musicHint = makeLabel(card, self.config.musicStatus, FONT_BODY, 10, theme.textDim, UDim2.fromOffset(48, 67), UDim2.new(1, -96, 0, 14), 16, Enum.TextXAlignment.Center)
+    local timeRight = makeLabel(card, "0:00", FONT_MONO, 10, theme.textDim, UDim2.new(1, -48, 0, 67), UDim2.fromOffset(48, 14), 16, Enum.TextXAlignment.Right)
+
+    local controls = create("Frame", {BackgroundTransparency = 1, Position = UDim2.fromOffset(0, 88), Size = UDim2.new(1, 0, 0, 36), ZIndex = 16}, card)
+    local prevBtn = makePillBtn(controls, theme.pillBg, 0.88, nil, UDim2.fromOffset(0, 3), UDim2.fromOffset(32, 30), 17)
+    makeSkipIcon(prevBtn, theme.text, "left", 18)
+    self:_trackConnection(prevBtn.MouseButton1Click:Connect(function() self:_prevMusicTrack() end))
+
+    local playBtn = makePillBtn(controls, Color3.fromRGB(255, 255, 255), 0.04, nil, UDim2.fromOffset(38, 0), UDim2.fromOffset(38, 36), 17)
+    addSpecularRim(playBtn, 1.2, 0.05, 0.55, 0.18)
+    local playCtrl = makePlayPauseIcon(playBtn, Color3.fromRGB(20, 24, 34), 18)
+    self:_trackConnection(playBtn.MouseButton1Click:Connect(function() self:_toggleMusicPlayback() end))
+
+    local nextBtn = makePillBtn(controls, theme.pillBg, 0.88, nil, UDim2.fromOffset(82, 3), UDim2.fromOffset(32, 30), 17)
+    makeSkipIcon(nextBtn, theme.text, "right", 18)
+    self:_trackConnection(nextBtn.MouseButton1Click:Connect(function() self:_nextMusicTrack() end))
+
+    local volumePill = create("Frame", {BackgroundColor3 = theme.segmentBg, BackgroundTransparency = theme.segmentTransparency, AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, 0, 0.5, 0), Size = UDim2.new(1, -124, 0, 30), ZIndex = 17}, controls)
+    addCorner(volumePill, UDim.new(1, 0))
+    local muteBtn = create("TextButton", {BackgroundTransparency = 1, Position = UDim2.fromOffset(4, 2), Size = UDim2.fromOffset(26, 26), Text = "", AutoButtonColor = false, ZIndex = 18}, volumePill)
+    local volumeIconCtrl = makeSpeakerIcon(muteBtn, theme.textDim, 19)
+    self:_trackConnection(muteBtn.MouseButton1Click:Connect(function() self:_toggleMusicMute() end))
+
+    local volumeTrack = makePillBtn(volumePill, theme.pillBg, 0.35, Vector2.new(0, 0.5), UDim2.new(0, 32, 0.5, 0), UDim2.new(1, -72, 0, 6), 18)
+    local volumeFill = create("Frame", {BackgroundColor3 = theme.accent, BorderSizePixel = 0, Size = UDim2.new(self.music.volume, 0, 1, 0), ZIndex = 19}, volumeTrack)
+    addCorner(volumeFill, UDim.new(1, 0))
+    local volumeText = makeLabel(volumePill, string.format("%d%%", math.floor(self.music.volume * 100 + 0.5)), FONT_MONO, 10, theme.textDim, UDim2.new(1, -38, 0.5, -8), UDim2.fromOffset(30, 16), 18, Enum.TextXAlignment.Right)
+    self:_trackConnection(volumeTrack.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            self._draggingVolume = true
+            if volumeTrack.AbsoluteSize.X > 0 then self:_setMusicVolume((input.Position.X - volumeTrack.AbsolutePosition.X) / volumeTrack.AbsoluteSize.X, true) end
+        end
+    end))
+
+    local libraryArea = create("Frame", {BackgroundTransparency = 1, Position = UDim2.fromOffset(0, 194), Size = UDim2.new(1, 0, 1, -194), ZIndex = 15}, content)
+    local _, musicTabIndicator, musicViewButtons = self:_buildSegmentedControl(libraryArea, MUSIC_TABS, 1, UDim2.fromOffset(0, 0), UDim2.new(1, 0, 0, 30), 15, function(key)
+        if key == "search" then self:_openMusicSearchTab() else self:_renderMusicCollection(key) end
+    end)
+
+    local searchRow = create("Frame", {BackgroundColor3 = theme.inputBg, BackgroundTransparency = theme.inputTransparency, Position = UDim2.fromOffset(0, 36), Size = UDim2.new(1, 0, 0, 32), Visible = false, ZIndex = 15}, libraryArea)
+    addCorner(searchRow, UDim.new(1, 0)); addStroke(searchRow, theme.rim, 0.80, 1)
+    local searchBox = create("TextBox", {BackgroundTransparency = 1, ClipsDescendants = true, Position = UDim2.fromOffset(12, 0), Size = UDim2.new(1, -68, 1, 0), Font = FONT_BODY, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left, TextColor3 = theme.text, PlaceholderColor3 = theme.textMuted, PlaceholderText = "Tim ten nhac hoac dan SoundId...", Text = "", ClearTextOnFocus = false, ZIndex = 16}, searchRow)
+    local searchGoBtn = makePillBtn(searchRow, theme.accent, 0.12, Vector2.new(1, 0.5), UDim2.new(1, -4, 0.5, 0), UDim2.fromOffset(48, 24), 16)
+    searchGoBtn.Font, searchGoBtn.TextSize, searchGoBtn.TextColor3, searchGoBtn.Text = FONT_BOLD, 11, Color3.fromRGB(255, 255, 255), "Tim"
+    self:_trackConnection(searchBox:GetPropertyChangedSignal("Text"):Connect(function() if self.music.viewMode == "search" then self:_queueMusicSearch(searchBox.Text) end end))
+    self:_trackConnection(searchBox.FocusLost:Connect(function(enter) if enter and self.music.viewMode == "search" then self:_runMusicSearch(searchBox.Text) end end))
+    self:_trackConnection(searchGoBtn.MouseButton1Click:Connect(function() self:_runMusicSearch(searchBox.Text) end))
+
+    local resultsScroll = create("ScrollingFrame", {
+        BackgroundTransparency = 1, BorderSizePixel = 0, Position = UDim2.fromOffset(0, 38), Size = UDim2.new(1, 0, 1, -38),
+        CanvasSize = UDim2.fromOffset(0, 0), ScrollBarThickness = 3, ScrollBarImageColor3 = theme.textMuted, ScrollBarImageTransparency = 0.45, ZIndex = 15
+    }, libraryArea)
+    create("UIListLayout", {SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 6)}, resultsScroll)
+
+    self._ui.musicContent, self._ui.musicCoverIcon, self._ui.musicTrackTitle, self._ui.musicTrackSubtitle = content, coverIcon, trackTitle, trackSub
+    self._ui.musicFavoriteButton, self._ui.musicFavoriteIcon, self._ui.musicRepeatButton, self._ui.musicRepeatIcon = favBtn, favIcon, repeatBtn, repeatIcon
+    self._ui.musicProgressTrack, self._ui.musicProgressFill, self._ui.musicProgressThumb, self._ui.musicTimeLeft, self._ui.musicTimeRight, self._ui.musicHint = progressTrack, progressFill, progressThumb, timeLeft, timeRight, musicHint
+    self._ui.musicPlayCtrl, self._ui.volumeTrack, self._ui.volumeFill, self._ui.volumeText, self._ui.volumeIconCtrl = playCtrl, volumeTrack, volumeFill, volumeText, volumeIconCtrl
+    self._ui.musicViewButtons, self._ui.musicTabIndicator, self._ui.musicSearchRow, self._ui.musicSearchBox, self._ui.musicResultsScroll = musicViewButtons, musicTabIndicator, searchRow, searchBox, resultsScroll
+end
+
+function FeedbackWidget:Mount(parent)
+    local env = getGlobalEnv()
+    local prevGlobal = env.__DacCauFeedbackWidgetActive
+    if prevGlobal and prevGlobal ~= self and type(prevGlobal) == "table" and type(prevGlobal.Destroy) == "function" then
+        pcall(function() prevGlobal:Destroy() end)
+    end
+    if FeedbackWidget._activeInstance and FeedbackWidget._activeInstance ~= self then FeedbackWidget._activeInstance:Destroy() end
+    FeedbackWidget._activeInstance = self
+    env.__DacCauFeedbackWidgetActive = self
+    if self.state.mounted and self._ui and self._ui.screenGui and self._ui.screenGui.Parent then return self end
+
+    cleanupOrphanedEffects()
+    local targetParent = getUiParent(parent)
+    for _, obj in ipairs(targetParent:GetChildren()) do if obj.Name == self.config.guiName and obj:IsA("ScreenGui") then obj:Destroy() end end
+
+    local theme = self.theme
+    local screenGui = create("ScreenGui", {Name = self.config.guiName, ResetOnSpawn = false, IgnoreGuiInset = true, ZIndexBehavior = Enum.ZIndexBehavior.Sibling, DisplayOrder = 100}, targetParent)
+    self._ui, self._reactiveSheens, self._ignoreGuiInset = {screenGui = screenGui}, {}, screenGui.IgnoreGuiInset
+    local layout = self:_collapsedLayout("feedback", false)
+
+    local function makeIslandShell(name, slot, icon, title, subtitle, fullVisible)
+        local shadow, shadowImg = buildOuterShadow(screenGui, 10, false)
+        shadow.Position, shadow.Size, shadow.Visible = slot.position, slot.size, false
+        local panel = create("Frame", {Name = name, ClipsDescendants = true, AnchorPoint = Vector2.new(0.5, 0), Position = slot.position, Size = slot.size, ZIndex = 12}, screenGui)
+        applyLiquidGlass(self, panel, {isIsland = true, radius = UDim.new(1, 0)})
+        local btn = create("TextButton", {BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Text = "", AutoButtonColor = false, ZIndex = 15}, panel)
+        local full = create("Frame", {BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Visible = fullVisible, ZIndex = 15}, btn)
+        local orb = create("Frame", {BackgroundColor3 = theme.accent, BackgroundTransparency = 0.14, AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 7, 0.5, 0), Size = UDim2.fromOffset(26, 26), ZIndex = 16}, full)
+        addCorner(orb, UDim.new(1, 0))
+        create("ImageLabel", {BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(14, 14), Image = icon, ImageColor3 = Color3.fromRGB(255, 255, 255), ZIndex = 17}, orb)
+        local titleLbl = makeLabel(full, title, FONT_BOLD, 12, theme.islandText, UDim2.fromOffset(40, 5), UDim2.new(1, -68, 0, 16), 16)
+        local subLbl = makeLabel(full, subtitle, FONT_BODY, 10, theme.islandDim, UDim2.fromOffset(40, 20), UDim2.new(1, -68, 0, 14), 16)
+        local dot = create("Frame", {BackgroundColor3 = theme.ok, BorderSizePixel = 0, AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -11, 0.5, 0), Size = UDim2.fromOffset(7, 7), ZIndex = 16}, full)
+        addCorner(dot, UDim.new(1, 0))
+        local iconOnly = create("ImageLabel", {BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(18, 18), Image = icon, ImageColor3 = theme.islandText, Visible = not fullVisible, ZIndex = 16}, btn)
+        return panel, shadow, shadowImg, btn, full, iconOnly, titleLbl, subLbl, dot
+    end
+
+    local panel, panelShadow, panelShadowImg, collapsedFeedback, fbFull, fbIconOnly = makeIslandShell("FeedbackIsland", layout.feedback, self.config.feedbackIcon, self.config.buttonLabel, "Gop y nhanh", true)
+    local musicPanel, musicShadow, musicShadowImg, collapsedMusic, muFull, muIconOnly, muTitle, muStatus, muStatusDot = makeIslandShell("MusicIsland", layout.music, self.config.musicIcon, self.config.musicLabel, self.config.musicStatus, false)
+
+    local eqHolder = create("Frame", {BackgroundTransparency = 1, AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -11, 0.5, 0), Size = UDim2.fromOffset(14, 14), ZIndex = 16}, muFull)
+    local eqBars = {}
+    for i = 1, 3 do
+        local bar = create("Frame", {BackgroundColor3 = theme.accent, BorderSizePixel = 0, AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, (i - 1) * 4, 1, -1), Size = UDim2.fromOffset(2, 4), Visible = false, ZIndex = 17}, eqHolder)
+        addCorner(bar, UDim.new(1, 0)); table.insert(eqBars, bar)
+    end
+
+    local peekTab = create("TextButton", {Name = "PeekTab", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, -36), Size = UDim2.fromOffset(64, 20), Text = "", AutoButtonColor = false, Visible = false, ZIndex = 18}, screenGui)
+    applyLiquidGlass(self, peekTab, {isIsland = true, radius = UDim.new(1, 0)}); makeChevronDownIcon(peekTab, theme.islandText, 20)
+
+    local toast = create("Frame", {Name = "LiquidGlassToast", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, self:_getSafeTopBase() + 10), Size = UDim2.fromOffset(288, 36), Visible = false, ZIndex = 30}, screenGui)
+    local toastGlass = applyLiquidGlass(self, toast, {isIsland = true, radius = UDim.new(1, 0)})
+    local toastDot = create("Frame", {BackgroundColor3 = theme.ok, BorderSizePixel = 0, AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 12, 0.5, 0), Size = UDim2.fromOffset(8, 8), ZIndex = 32}, toast)
+    addCorner(toastDot, UDim.new(1, 0))
+    local toastText = makeLabel(toast, "", FONT_MEDIUM, 12, theme.islandText, UDim2.fromOffset(28, 0), UDim2.new(1, -40, 1, 0), 32)
+
+    self._ui.panel, self._ui.panelShadow, self._ui.panelShadowImg = panel, panelShadow, panelShadowImg
+    self._ui.musicPanel, self._ui.musicShadow, self._ui.musicShadowImg = musicPanel, musicShadow, musicShadowImg
+    self._ui.collapsedFeedback, self._ui.collapsedFeedbackFull, self._ui.collapsedFeedbackIconOnly = collapsedFeedback, fbFull, fbIconOnly
+    self._ui.collapsedMusic, self._ui.collapsedMusicFull, self._ui.collapsedMusicIconOnly = collapsedMusic, muFull, muIconOnly
+    self._ui.musicTitle, self._ui.musicStatus, self._ui.musicStatusDot, self._ui.eqBars = muTitle, muStatus, muStatusDot, eqBars
+    self._ui.peekTab, self._ui.toast, self._ui.toastDot, self._ui.toastText, self._ui.toastStroke = peekTab, toast, toastDot, toastText, toastGlass.outerStroke
+
+    self:_ensurePanelLensRig(panel); self:_ensurePanelLensRig(musicPanel)
+    self:_buildFeedbackBody(panel, theme); self:_buildMusicBody(musicPanel, theme)
+
+    self:_trackConnection(collapsedFeedback.MouseButton1Click:Connect(function()
+        if self.state.hidden then self:_markIslandActivity() return end
+        if self.state.activeIsland ~= "feedback" then self:_switchIsland("feedback") else self:_togglePanel(true) end
+    end))
+    self:_trackConnection(collapsedMusic.MouseButton1Click:Connect(function()
+        if self.state.hidden then self:_markIslandActivity() return end
+        if self.state.activeIsland ~= "music" then self:_switchIsland("music") else self:_toggleMusicPanel(true) end
+    end))
+    for _, btn in ipairs({collapsedFeedback, collapsedMusic, peekTab}) do
+        self:_trackConnection(btn.MouseEnter:Connect(function() self._islandHovering = true; self:_markIslandActivity() end))
+        self:_trackConnection(btn.MouseLeave:Connect(function() self._islandHovering = false; self:_scheduleAutoHide() end))
+    end
+    self:_trackConnection(peekTab.MouseButton1Click:Connect(function() self:_markIslandActivity() end))
+
+    self:_trackConnection(UserInputService.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            if self._draggingSheet and self.state.open and self._dragPanel then
+                local delta = Vector2.new(input.Position.X, input.Position.Y) - self._dragStartInput
+                local screen, pSize = self:_getScreenSize(), self._dragPanel.AbsoluteSize
+                local minX, maxX = pSize.X * 0.5 + 8, math.max(pSize.X * 0.5 + 8, screen.X - pSize.X * 0.5 - 8)
+                local minY, maxY = self:_getSafeTopBase() + 6, math.max(self:_getSafeTopBase() + 6, screen.Y - pSize.Y - 8)
+                local nx = math.clamp(self._dragStartPos.X + delta.X, minX, maxX)
+                local ny = math.clamp(self._dragStartPos.Y + delta.Y, minY, maxY)
+                self._sheetCustomPos = Vector2.new(nx, ny)
+                local newPos = UDim2.fromOffset(nx, ny)
+                self._dragPanel.Position = newPos
+                if self._dragShadow then self._dragShadow.Position = newPos end
+            end
+            if self._seekingProgress then self:_seekMusicAtScreenX(input.Position.X) end
+            if self._draggingVolume and self._ui.volumeTrack and self._ui.volumeTrack.AbsoluteSize.X > 0 then
+                local vt = self._ui.volumeTrack
+                self:_setMusicVolume((input.Position.X - vt.AbsolutePosition.X) / vt.AbsoluteSize.X, true)
+            end
+            if self.state.hidden and not self.state.open and self:_isPointerNearIsland() then self:_markIslandActivity() end
+            self:_updateReactiveSheens(UserInputService:GetMouseLocation())
+        end
+    end))
+    self:_trackConnection(UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            self._seekingProgress, self._draggingVolume, self._draggingSheet = false, false, false
+        end
+    end))
+    self:_trackConnection(screenGui:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+        if not self.state.mounted then return end
+        if self.state.open then
+            local isMusic = self.state.activeIsland == "music"
+            local size, pos = self:_getSheetBounds(isMusic)
+            local target, shadow = isMusic and musicPanel or panel, isMusic and musicShadow or panelShadow
+            target.Size, target.Position = size, pos; self:_syncShadow(shadow, pos, size, true)
+        else self:_applyCollapsedLayout(false, self.state.activeIsland) end
+    end))
+    self:_trackConnection(RunService.RenderStepped:Connect(function()
+        if not self.state.mounted then return end
+        if not self._ui or not self._ui.screenGui or not self._ui.screenGui.Parent then
+            self:Destroy()
+            return
+        end
+        if self.state.open then self:_updateAcrylic(); self:_updateBackdropLens() else self:_hideAcrylic() end
+        local playing = self.music and self.music.playing
+        if playing then self:_updateMusicProgress() end
+        if self._ui.eqBars and self._ui.musicStatusDot then
+            local showEq = playing and not self.state.open and self.state.activeIsland == "music"
+            self._ui.musicStatusDot.Visible = not showEq
+            local t = os.clock() * 7.5
+            for i, bar in ipairs(self._ui.eqBars) do
+                bar.Visible = showEq
+                if showEq then bar.Size = UDim2.fromOffset(2, 4 + math.floor((math.sin(t + i * 1.45) * 0.5 + 0.5) * 9)) end
+            end
+        end
+    end))
+
+    self.state.mounted = true
+    self:_loadMusicStorage(); self:_syncMusicFavoriteMap()
+    self.music.index = math.max(1, tonumber(self.music.index) or 1)
+    self:_applySoundVolume(); self:_renderMusicCollection("playlist", nil, true)
+    self:_loadMusicTrack(self.music.index, self.config.musicAutoPlay)
+    self:_refreshMetaPreview(); self:_setTab(self.state.activeTab, true)
+    self:_applyCollapsedLayout(false, "feedback"); self:_scheduleAutoHide()
+    return self
+end
+
+function FeedbackWidget:Destroy()
+    self.state.mounted, self.state.open, self.state.hidden = false, false, false
+    self._islandHovering, self._seekingProgress, self._draggingVolume, self._draggingSheet = false, false, false, false
+    self._sheetCustomPos, self._dragPanel, self._dragShadow = nil, nil, nil
+    self._animToken, self._toastToken, self._hideToken = self._animToken + 1, self._toastToken + 1, self._hideToken + 1
+    self._submitToken, self._musicSearchToken, self._musicLoadToken = self._submitToken + 1, self._musicSearchToken + 1, self._musicLoadToken + 1
+    self:_cancelTweens()
+    for _, conn in ipairs(self._connections or {}) do pcall(function() conn:Disconnect() end) end
+    self._connections = {}
+    self:_destroyAcrylic()
+    self:_clearBackdropLens()
+    self._lensRigs = {}
+    if self._worldBlur then pcall(function() self._worldBlur:Destroy() end); self._worldBlur = nil end
+    if self.music then
+        self.music.playing, self.music.paused, self.music.loadedSoundId = false, false, nil
+        if self.music.sound then pcall(function() self.music.sound:Stop(); self.music.sound:Destroy() end); self.music.sound = nil end
+    end
+    if self._ui and self._ui.screenGui then pcall(function() self._ui.screenGui:Destroy() end) end
+    self._ui, self._reactiveSheens, self._glass = {}, {}, {}
+    if FeedbackWidget._activeInstance == self then FeedbackWidget._activeInstance = nil end
+    local env = getGlobalEnv()
+    if env.__DacCauFeedbackWidgetActive == self then env.__DacCauFeedbackWidgetActive = nil end
+end
+
+return FeedbackWidget
